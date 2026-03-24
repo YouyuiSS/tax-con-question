@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>匿名提问首页</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;family=Work+Sans:wght@300;400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface": "#2d3432",
+              "surface": "#f9f9f7",
+              "surface-dim": "#d4dcd8",
+              "primary-dim": "#3c5662",
+              "tertiary-container": "#eef5fa",
+              "primary": "#48626e",
+              "surface-tint": "#48626e",
+              "on-background": "#2d3432",
+              "surface-container-low": "#f2f4f2",
+              "on-primary-fixed": "#29434e",
+              "tertiary-dim": "#4d5458",
+              "on-tertiary-fixed": "#434b4f",
+              "secondary-fixed": "#d1e8dd",
+              "surface-bright": "#f9f9f7",
+              "secondary-container": "#d1e8dd",
+              "primary-fixed": "#cbe7f5",
+              "on-tertiary-container": "#555d61",
+              "on-secondary-fixed": "#2f433c",
+              "primary-container": "#cbe7f5",
+              "surface-container-lowest": "#ffffff",
+              "secondary-dim": "#43574f",
+              "inverse-surface": "#0c0f0e",
+              "surface-variant": "#dee4e0",
+              "on-primary-container": "#3c5561",
+              "on-secondary": "#e7fef3",
+              "on-secondary-fixed-variant": "#4b6057",
+              "on-primary": "#eff9ff",
+              "tertiary": "#596064",
+              "on-error": "#fff7f6",
+              "surface-container": "#ecefec",
+              "primary-fixed-dim": "#bdd9e6",
+              "tertiary-fixed": "#eef5fa",
+              "on-tertiary-fixed-variant": "#60676c",
+              "error": "#9f403d",
+              "surface-container-high": "#e5e9e6",
+              "secondary": "#4f645b",
+              "error-container": "#fe8983",
+              "on-tertiary": "#f3faff",
+              "on-secondary-container": "#42564e",
+              "outline": "#767c79",
+              "tertiary-fixed-dim": "#dfe6eb",
+              "secondary-fixed-dim": "#c3dacf",
+              "error-dim": "#4e0309",
+              "on-primary-fixed-variant": "#455f6b",
+              "on-error-container": "#752121",
+              "inverse-on-surface": "#9c9d9b",
+              "outline-variant": "#adb3b0",
+              "inverse-primary": "#ceeaf8",
+              "on-surface-variant": "#5a605e",
+              "background": "#f9f9f7",
+              "surface-container-highest": "#dee4e0"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Work Sans"],
+              "label": ["Work Sans"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        -webkit-tap-highlight-color: transparent;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-secondary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#f9f9f7]/85 backdrop-blur-xl transition-colors duration-300">
+<div class="flex items-center justify-between px-6 h-16 w-full">
+<button class="text-[#48626e] hover:bg-[#ecefec]/50 transition-colors duration-300 p-2 rounded-full">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline text-lg tracking-tight font-medium text-[#2d3432]">匿名提问首页</h1>
+<div class="w-10"></div> <!-- Spacer to maintain center -->
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-md mx-auto">
+<!-- Trust Banner -->
+<section class="mb-10">
+<div class="bg-tertiary-container p-5 rounded-xl flex items-start gap-4">
+<span class="material-symbols-outlined text-primary-dim mt-0.5" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<p class="text-sm leading-relaxed text-on-tertiary-container font-medium">
+                    提问默认为私密，直到会议开始。你的原话永远不会被改写。系统不收集任何个人身份信息。
+                </p>
+</div>
+</section>
+<!-- Input Section -->
+<section class="mb-12">
+<div class="relative">
+<textarea class="w-full h-48 bg-surface-container-highest border-none rounded-xl p-6 font-body text-lg focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all duration-300 placeholder:text-on-surface-variant/50 resize-none" placeholder="你想说些什么？"></textarea>
+<div class="absolute bottom-4 right-6 text-xs font-label tracking-widest text-outline uppercase">
+                    0 / 500
+                </div>
+</div>
+</section>
+<!-- Processing Mode Selection -->
+<section class="space-y-4">
+<h2 class="font-headline text-sm font-semibold tracking-wider text-outline uppercase mb-4 ml-1">处理方式</h2>
+<!-- Option 1: Recommended -->
+<div class="group relative bg-secondary-container p-5 rounded-xl cursor-pointer hover:opacity-90 transition-opacity duration-300">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-secondary-container">meeting_room</span>
+<h3 class="font-headline font-bold text-on-secondary-container">会上公开 (推荐)</h3>
+</div>
+<span class="bg-surface-container-lowest text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter text-secondary">推荐</span>
+</div>
+<p class="text-sm text-on-secondary-container/80 leading-snug">在直播环节开始前保持隐藏。最适合全员Q&amp;A。</p>
+</div>
+<!-- Option 2 -->
+<div class="group bg-surface-container-low p-5 rounded-xl cursor-pointer hover:bg-surface-container transition-colors duration-300">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary">forum</span>
+<h3 class="font-headline font-semibold text-on-surface">公开讨论</h3>
+</div>
+<p class="text-sm text-on-surface-variant leading-snug">立即对所有参与者可见，用于异步同行反馈。</p>
+</div>
+<!-- Option 3 -->
+<div class="group bg-surface-container-low p-5 rounded-xl cursor-pointer hover:bg-surface-container transition-colors duration-300">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary">shield_person</span>
+<h3 class="font-headline font-semibold text-on-surface">直达领导层</h3>
+</div>
+<p class="text-sm text-on-surface-variant leading-snug">严格保密。仅对执行领导团队可见。</p>
+</div>
+</section>
+</main>
+<!-- Bottom Action Bar -->
+<footer class="fixed bottom-0 left-0 w-full z-50">
+<div class="bg-[#f9f9f7]/85 backdrop-blur-xl px-6 pt-4 pb-8 flex justify-center items-center">
+<button class="w-full max-w-sm py-4 bg-gradient-to-br from-primary to-primary-dim text-on-primary font-headline font-bold rounded-full shadow-[0_8px_32px_-8px_rgba(72,98,110,0.3)] hover:opacity-90 active:scale-95 transition-all duration-400 ease-out tracking-tight">
+                继续
+            </button>
+</div>
+</footer>
+<!-- BottomNavBar (Hidden on this transactional screen as per Shell Visibility Rule) -->
+<!-- Suppressed to prioritize the "Continue" focus journey -->
+</body></html>

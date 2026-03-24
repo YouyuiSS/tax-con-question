@@ -1,0 +1,17 @@
+[Unit]
+Description=tax-con-question backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/tax-con-question/current/backend
+Environment=NODE_ENV=production
+EnvironmentFile=/srv/tax-con-question/shared/backend.env
+ExecStart=/usr/bin/env node dist/server.js
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

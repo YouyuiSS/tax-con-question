@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer utilities {
+  .bg-mesh {
+    background-color: #020617;
+    background-image: 
+      radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+      radial-gradient(at 50% 0%, hsla(225,39%,30%,0.5) 0, transparent 50%), 
+      radial-gradient(at 100% 0%, hsla(339,49%,30%,0.5) 0, transparent 50%);
+    background-size: 200% 200%;
+    animation: gradientMove 15s ease infinite;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    transform-style: preserve-3d;
+  }
+
+  .gold-glow {
+    box-shadow: 0 0 40px rgba(250, 204, 21, 0.4), inset 0 0 20px rgba(250, 204, 21, 0.1) !important;
+    border: 2px solid rgba(250, 204, 21, 0.6) !important;
+    animation: pulse-gold 2s infinite alternate;
+  }
+
+  .holo-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+  .holo-sweep::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -150%;
+    width: 50%; height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.15), transparent);
+    transform: skewX(-25deg);
+    animation: sweep 6s infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes pulse-gold {
+  0% { box-shadow: 0 0 30px rgba(250, 204, 21, 0.3), inset 0 0 15px rgba(250, 204, 21, 0.1); }
+  100% { box-shadow: 0 0 60px rgba(250, 204, 21, 0.6), inset 0 0 30px rgba(250, 204, 21, 0.3); }
+}
+
+@keyframes sweep {
+  0%, 50% { left: -150%; }
+  100% { left: 250%; }
+}
+
+@keyframes spin-globe {
+  0% { transform: rotateY(0deg) rotateX(5deg); }
+  100% { transform: rotateY(360deg) rotateX(5deg); }
+}
+
+.animate-spin-globe {
+  animation: spin-globe 40s linear infinite;
+  transform-style: preserve-3d;
+}
+
+.animate-spin-globe:hover {
+  animation-play-state: paused;
+}
+
+@keyframes float {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(5%, 5%) scale(1.1); }
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  mix-blend-mode: screen;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }

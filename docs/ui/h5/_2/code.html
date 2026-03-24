@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Reflections | 确认提交</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Work+Sans:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface": "#2d3432",
+              "surface": "#f9f9f7",
+              "surface-dim": "#d4dcd8",
+              "primary-dim": "#3c5662",
+              "tertiary-container": "#eef5fa",
+              "primary": "#48626e",
+              "surface-tint": "#48626e",
+              "on-background": "#2d3432",
+              "surface-container-low": "#f2f4f2",
+              "on-primary-fixed": "#29434e",
+              "tertiary-dim": "#4d5458",
+              "on-tertiary-fixed": "#434b4f",
+              "secondary-fixed": "#d1e8dd",
+              "surface-bright": "#f9f9f7",
+              "secondary-container": "#d1e8dd",
+              "primary-fixed": "#cbe7f5",
+              "on-tertiary-container": "#555d61",
+              "on-secondary-fixed": "#2f433c",
+              "primary-container": "#cbe7f5",
+              "surface-container-lowest": "#ffffff",
+              "secondary-dim": "#43574f",
+              "inverse-surface": "#0c0f0e",
+              "surface-variant": "#dee4e0",
+              "on-primary-container": "#3c5561",
+              "on-secondary": "#e7fef3",
+              "on-secondary-fixed-variant": "#4b6057",
+              "on-primary": "#eff9ff",
+              "tertiary": "#596064",
+              "on-error": "#fff7f6",
+              "surface-container": "#ecefec",
+              "primary-fixed-dim": "#bdd9e6",
+              "tertiary-fixed": "#eef5fa",
+              "on-tertiary-fixed-variant": "#60676c",
+              "error": "#9f403d",
+              "surface-container-high": "#e5e9e6",
+              "secondary": "#4f645b",
+              "error-container": "#fe8983",
+              "on-tertiary": "#f3faff",
+              "on-secondary-container": "#42564e",
+              "outline": "#767c79",
+              "tertiary-fixed-dim": "#dfe6eb",
+              "secondary-fixed-dim": "#c3dacf",
+              "error-dim": "#4e0309",
+              "on-primary-fixed-variant": "#455f6b",
+              "on-error-container": "#752121",
+              "inverse-on-surface": "#9c9d9b",
+              "outline-variant": "#adb3b0",
+              "inverse-primary": "#ceeaf8",
+              "on-surface-variant": "#5a605e",
+              "background": "#f9f9f7",
+              "surface-container-highest": "#dee4e0"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Work Sans"],
+              "label": ["Work Sans"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Work Sans', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+        .glass-blur { backdrop-filter: blur(12px); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface overflow-hidden">
+<!-- Background Content (Simulated Homepage) -->
+<div class="fixed inset-0 z-0 overflow-y-auto filter blur-sm transition-all duration-700 brightness-75">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#f9f9f7]/85 backdrop-blur-xl flex items-center justify-between px-6 h-16 w-full">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#48626e]" data-icon="arrow_back">arrow_back</span>
+<span class="font-manrope text-lg tracking-tight font-medium text-[#48626e]">Reflections</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest"></div>
+</header>
+<main class="pt-24 px-6 pb-32 space-y-10 max-w-md mx-auto">
+<section>
+<h1 class="text-display-md text-on-surface font-extrabold tracking-tight mb-2">晨间反馈</h1>
+<p class="text-on-surface-variant leading-relaxed">今天的团队同步会议感觉如何？</p>
+</section>
+<div class="space-y-6">
+<div class="p-8 bg-surface-container-lowest rounded-xl shadow-sm border-0">
+<div class="h-4 w-24 bg-surface-container rounded mb-4"></div>
+<div class="h-20 w-full bg-surface-container-low rounded-md"></div>
+</div>
+<div class="p-8 bg-surface-container-lowest rounded-xl shadow-sm border-0">
+<div class="h-4 w-32 bg-surface-container rounded mb-4"></div>
+<div class="h-12 w-full bg-surface-container-low rounded-md"></div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-8 pb-6 pt-3 bg-[#f9f9f7]/85 backdrop-blur-xl shadow-[0_-4px_24px_0_rgba(45,52,50,0.04)]">
+<div class="flex flex-col items-center justify-center text-[#5c615e] p-3">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#d1e8dd] text-[#42564e] rounded-full p-3">
+<span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#5c615e] p-3">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+</div>
+</nav>
+</div>
+<!-- Scrim Overlay -->
+<div class="fixed inset-0 bg-on-surface/20 z-40"></div>
+<!-- Bottom Sheet Component -->
+<div class="fixed bottom-0 left-0 right-0 z-50 transform translate-y-0 transition-transform duration-500 ease-out flex flex-col items-center">
+<!-- Sheet Handle -->
+<div class="w-12 h-1.5 bg-surface-variant rounded-full mb-3 opacity-80"></div>
+<!-- Sheet Body -->
+<div class="w-full max-w-lg bg-surface-container-lowest rounded-t-[2.5rem] px-8 pt-10 pb-12 shadow-[0_-12px_40px_rgba(0,0,0,0.08)]">
+<div class="flex flex-col items-center text-center space-y-6">
+<!-- Visual Anchor -->
+<div class="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-on-secondary-container text-3xl" data-icon="verified_user" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+</div>
+<div class="space-y-2">
+<h2 class="text-2xl font-bold text-on-surface tracking-tight">准备好提交了吗？</h2>
+<p class="text-on-surface-variant body-lg leading-relaxed px-4">你的反馈将分享至团队领导看板。</p>
+</div>
+<!-- Choice Summary -->
+<div class="w-full bg-surface-container-low p-5 rounded-xl flex items-center gap-4">
+<div class="p-3 bg-white rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-primary" data-icon="groups">groups</span>
+</div>
+<div class="text-left">
+<p class="text-xs uppercase tracking-widest text-outline font-semibold mb-1">已选范围</p>
+<p class="text-on-surface font-semibold">[会上公开]</p>
+</div>
+</div>
+<!-- Trust Check -->
+<div class="flex items-center gap-2 bg-secondary-container/30 px-4 py-2 rounded-full">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span>
+<span class="text-xs font-medium text-on-secondary-fixed-variant">匿名且加密。不会关联任何身份 ID。</span>
+</div>
+<!-- Actions -->
+<div class="w-full space-y-4 pt-6">
+<button class="w-full bg-primary text-on-primary font-semibold py-5 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 bg-gradient-to-r from-primary to-primary-dim">
+                    确认提交
+                </button>
+<button class="w-full text-on-surface-variant font-medium py-4 rounded-full hover:bg-surface-container transition-colors duration-300">
+                    返回修改
+                </button>
+</div>
+</div>
+<!-- Footer Decorative Element -->
+<div class="mt-8 flex justify-center opacity-20">
+<div class="w-24 h-1 bg-outline-variant rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Background Decoration -->
+<div class="fixed top-[-10%] right-[-10%] w-[50%] h-[50%] bg-secondary-container/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+<div class="fixed bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary-container/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+</body></html>

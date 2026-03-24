@@ -1,0 +1,5 @@
+{
+  "name": "全员大会答疑大屏",
+  "description": "A real-time meeting question wall with SSE-powered live updates and animated question arrival effects.",
+  "requestFramePermissions": []
+}

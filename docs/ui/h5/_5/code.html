@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>公开讨论 - 企业全员大会</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Work+Sans:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "outline-variant": "#adb3b0",
+                        "inverse-surface": "#0c0f0e",
+                        "on-surface": "#2d3432",
+                        "surface-bright": "#f9f9f7",
+                        "on-tertiary-fixed": "#434b4f",
+                        "on-primary-fixed": "#29434e",
+                        "error": "#9f403d",
+                        "primary-container": "#cbe7f5",
+                        "surface-variant": "#dee4e0",
+                        "inverse-on-surface": "#9c9d9b",
+                        "secondary-container": "#d1e8dd",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f2f4f2",
+                        "primary-fixed": "#cbe7f5",
+                        "on-error": "#fff7f6",
+                        "tertiary-container": "#eef5fa",
+                        "secondary-fixed": "#d1e8dd",
+                        "on-tertiary-fixed-variant": "#60676c",
+                        "surface": "#f9f9f7",
+                        "secondary": "#4f645b",
+                        "outline": "#767c79",
+                        "background": "#f9f9f7",
+                        "on-tertiary-container": "#555d61",
+                        "tertiary-fixed-dim": "#dfe6eb",
+                        "surface-container": "#ecefec",
+                        "tertiary-fixed": "#eef5fa",
+                        "secondary-dim": "#43574f",
+                        "surface-dim": "#d4dcd8",
+                        "on-primary-fixed-variant": "#455f6b",
+                        "on-secondary-fixed-variant": "#4b6057",
+                        "secondary-fixed-dim": "#c3dacf",
+                        "inverse-primary": "#ceeaf8",
+                        "surface-tint": "#48626e",
+                        "surface-container-highest": "#dee4e0",
+                        "on-secondary": "#e7fef3",
+                        "on-primary": "#eff9ff",
+                        "on-primary-container": "#3c5561",
+                        "primary-fixed-dim": "#bdd9e6",
+                        "tertiary-dim": "#4d5458",
+                        "on-secondary-fixed": "#2f433c",
+                        "error-dim": "#4e0309",
+                        "primary": "#48626e",
+                        "primary-dim": "#3c5662",
+                        "on-tertiary": "#f3faff",
+                        "on-background": "#2d3432",
+                        "surface-container-high": "#e5e9e6",
+                        "error-container": "#fe8983",
+                        "on-surface-variant": "#5a605e",
+                        "tertiary": "#596064",
+                        "on-error-container": "#752121",
+                        "on-secondary-container": "#42564e"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Work Sans"],
+                        "label": ["Work Sans"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #f9f9f7;
+            font-family: 'Work Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .editorial-shadow {
+            box-shadow: 0 8px 32px rgba(45, 52, 50, 0.06);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center px-6 h-16 bg-[#f9f9f7]/85 backdrop-blur-md transition-colors duration-300">
+<div class="flex items-center gap-4 w-full">
+<button class="text-[#48626e] hover:bg-[#ecefec] p-2 rounded-full transition-colors duration-300">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-['Manrope'] font-semibold text-lg tracking-tight text-[#48626e]">公开讨论</h1>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-2xl mx-auto">
+<!-- Editorial Intro Section -->
+<section class="mb-10">
+<p class="font-body text-sm text-on-surface-variant leading-relaxed opacity-80">
+                这里只展示已审核通过并允许公开的问题
+            </p>
+</section>
+<!-- Search Bar -->
+<section class="mb-8">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant">search</span>
+<input class="w-full pl-12 pr-4 py-4 bg-surface-container-highest rounded-xl border-none focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all duration-300 font-body text-on-surface placeholder-outline-variant" placeholder="搜索公开问题" type="text"/>
+</div>
+</section>
+<!-- Category Tabs -->
+<section class="mb-10 overflow-x-auto no-scrollbar">
+<div class="flex gap-3 whitespace-nowrap">
+<button class="px-5 py-2 bg-primary text-white rounded-full font-label text-sm font-medium transition-all shadow-sm">全部</button>
+<button class="px-5 py-2 bg-surface-container text-on-surface-variant rounded-full font-label text-sm font-medium hover:bg-surface-container-highest transition-colors">晋升标准</button>
+<button class="px-5 py-2 bg-surface-container text-on-surface-variant rounded-full font-label text-sm font-medium hover:bg-surface-container-highest transition-colors">薪酬福利</button>
+<button class="px-5 py-2 bg-surface-container text-on-surface-variant rounded-full font-label text-sm font-medium hover:bg-surface-container-highest transition-colors">远程办公</button>
+<button class="px-5 py-2 bg-surface-container text-on-surface-variant rounded-full font-label text-sm font-medium hover:bg-surface-container-highest transition-colors">公司战略</button>
+</div>
+</section>
+<!-- Question Cards List -->
+<div class="space-y-6">
+<!-- Card 1 -->
+<article class="bg-surface-container-lowest rounded-xl p-6 editorial-shadow border border-outline-variant/5 hover:bg-secondary-container/20 transition-colors duration-300">
+<div class="flex justify-between items-start mb-4">
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-[10px] font-bold tracking-wider uppercase">政策调整</span>
+<span class="text-xs font-medium text-primary bg-primary-container/30 px-2 py-1 rounded">待回应</span>
+</div>
+<h2 class="font-headline font-semibold text-lg text-on-surface leading-snug mb-6">
+                    关于公司下季度的远程办公政策，是否会有更具体的调整方案？
+                </h2>
+<div class="flex items-center text-xs text-outline-variant font-label">
+<span class="material-symbols-outlined text-sm mr-1">calendar_today</span>
+                    2026-03-24
+                </div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface-container-lowest rounded-xl p-6 editorial-shadow border border-outline-variant/5 hover:bg-secondary-container/20 transition-colors duration-300">
+<div class="flex justify-between items-start mb-4">
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-[10px] font-bold tracking-wider uppercase">晋升标准</span>
+<span class="text-xs font-medium text-secondary bg-secondary-container px-2 py-1 rounded">已回应</span>
+</div>
+<h3 class="font-headline font-semibold text-lg text-on-surface leading-snug mb-6">
+                    技术序列的 T4 晋升评审中，对于跨团队协作的影响力如何量化评估？
+                </h3>
+<div class="flex items-center text-xs text-outline-variant font-label">
+<span class="material-symbols-outlined text-sm mr-1">calendar_today</span>
+                    2026-03-22
+                </div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surface-container-lowest rounded-xl p-6 editorial-shadow border border-outline-variant/5 hover:bg-secondary-container/20 transition-colors duration-300">
+<div class="flex justify-between items-start mb-4">
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-[10px] font-bold tracking-wider uppercase">公司战略</span>
+<span class="text-xs font-medium text-primary bg-primary-container/30 px-2 py-1 rounded">待回应</span>
+</div>
+<h3 class="font-headline font-semibold text-lg text-on-surface leading-snug mb-6">
+                    海外市场扩张计划中，首批试点城市的选择标准主要基于哪些核心指标？
+                </h3>
+<div class="flex items-center text-xs text-outline-variant font-label">
+<span class="material-symbols-outlined text-sm mr-1">calendar_today</span>
+                    2026-03-20
+                </div>
+</article>
+</div>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-8 pb-6 pt-4 bg-[#f9f9f7]/85 backdrop-blur-md shadow-[0_-4px_24px_rgba(45,52,50,0.04)]">
+<!-- Active Tab: Discussions -->
+<a class="flex flex-col items-center justify-center bg-[#48626e] text-white rounded-full px-6 py-2 scale-105 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="forum">forum</span>
+<span class="font-['Work_Sans'] text-[10px] font-medium uppercase tracking-widest mt-1">Discussions</span>
+</a>
+<!-- Inactive Tab: Go Ask -->
+<a class="flex flex-col items-center justify-center text-[#2d3432] opacity-60 hover:opacity-100 transition-opacity" href="#">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-['Work_Sans'] text-[10px] font-medium uppercase tracking-widest mt-1">Go Ask</span>
+</a>
+</nav>
+<!-- Subtle Texture Overlay -->
+<div class="fixed inset-0 pointer-events-none opacity-[0.03] z-[100]" data-alt="subtle natural paper texture for an organic editorial feel" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDvicq8mEYHWu0TpI76CYA1YWn-Nop0hRCmH3fv7-AbXBM_hEZYTzKslxr3r4UtK3fZgJAaWjNhfdu_SQSMKllv7VnZzkwAWSU5Bdo1LXbPOKjxuc33C_oIWXe6gpnt1cMGLEeyfC6XTVLhYUUMCaLMYnUfIMYOvovWgRXdMAkRc6U8hkfi3M6jygtNQIPkitLXdCWZnsKtHWs0gcmoS88hOLd8_5ptZsZY_42oEs7G6nQWYKbygmlFSXLW3E3D6wjqY6V0LwRaS-s');"></div>
+</body></html>

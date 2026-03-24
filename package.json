@@ -1,0 +1,22 @@
+{
+  "name": "tax-con-question",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/backend",
+    "apps/h5"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "lint:web": "npm --workspace apps/web run lint",
+    "dev:backend": "npm --workspace apps/backend run dev",
+    "build:backend": "npm --workspace apps/backend run build",
+    "lint:backend": "npm --workspace apps/backend run lint",
+    "dev:h5": "npm --workspace apps/h5 run dev",
+    "build:h5": "npm --workspace apps/h5 run build",
+    "lint:h5": "npm --workspace apps/h5 run lint",
+    "build:all": "npm run build:backend && npm run build:web && npm run build:h5",
+    "deploy:ecs": "bash ./scripts/deploy-ecs.sh"
+  }
+}

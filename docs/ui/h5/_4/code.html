@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Work+Sans:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "outline-variant": "#adb3b0",
+              "inverse-surface": "#0c0f0e",
+              "on-surface": "#2d3432",
+              "surface-bright": "#f9f9f7",
+              "on-tertiary-fixed": "#434b4f",
+              "on-primary-fixed": "#29434e",
+              "error": "#9f403d",
+              "primary-container": "#cbe7f5",
+              "surface-variant": "#dee4e0",
+              "inverse-on-surface": "#9c9d9b",
+              "secondary-container": "#d1e8dd",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#f2f4f2",
+              "primary-fixed": "#cbe7f5",
+              "on-error": "#fff7f6",
+              "tertiary-container": "#eef5fa",
+              "secondary-fixed": "#d1e8dd",
+              "on-tertiary-fixed-variant": "#60676c",
+              "surface": "#f9f9f7",
+              "secondary": "#4f645b",
+              "outline": "#767c79",
+              "background": "#f9f9f7",
+              "on-tertiary-container": "#555d61",
+              "tertiary-fixed-dim": "#dfe6eb",
+              "surface-container": "#ecefec",
+              "tertiary-fixed": "#eef5fa",
+              "secondary-dim": "#43574f",
+              "surface-dim": "#d4dcd8",
+              "on-primary-fixed-variant": "#455f6b",
+              "on-secondary-fixed-variant": "#4b6057",
+              "secondary-fixed-dim": "#c3dacf",
+              "inverse-primary": "#ceeaf8",
+              "surface-tint": "#48626e",
+              "surface-container-highest": "#dee4e0",
+              "on-secondary": "#e7fef3",
+              "on-primary": "#eff9ff",
+              "on-primary-container": "#3c5561",
+              "primary-fixed-dim": "#bdd9e6",
+              "tertiary-dim": "#4d5458",
+              "on-secondary-fixed": "#2f433c",
+              "error-dim": "#4e0309",
+              "primary": "#48626e",
+              "primary-dim": "#3c5662",
+              "on-tertiary": "#f3faff",
+              "on-background": "#2d3432",
+              "surface-container-high": "#e5e9e6",
+              "error-container": "#fe8983",
+              "on-surface-variant": "#5a605e",
+              "tertiary": "#596064",
+              "on-error-container": "#752121",
+              "on-secondary-container": "#42564e"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Work Sans"],
+              "label": ["Work Sans"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #f9f9f7;
+            font-family: 'Work Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .editorial-shadow {
+            box-shadow: 0 8px 32px rgba(45, 52, 50, 0.06);
+        }
+    </style>
+<style>
+    body {
+      min-height: 100dvh;
+    }
+  </style>
+</head>
+<body class="text-on-surface">
+<!-- TopAppBar -->
+<nav class="fixed top-0 left-0 w-full z-50 flex flex-col px-6 pt-4 pb-4 bg-[#f9f9f7]/85 backdrop-blur-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-[#ecefec] transition-colors duration-300 text-[#48626e]">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-['Manrope'] font-semibold text-lg tracking-tight text-[#48626e]">公开讨论</h1>
+</div>
+<div class="w-10"></div>
+</div>
+<!-- Explanation text below the title -->
+<div class="mt-2 ml-14">
+<p class="font-body text-xs text-on-surface-variant/80">
+            这里只展示已审核通过并允许公开的问题
+        </p>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="min-h-screen pt-32 pb-12 flex flex-col items-center justify-center px-8">
+<!-- Empty State Container -->
+<div class="w-full max-w-md flex flex-col items-center text-center">
+<!-- Minimal Editorial Graphic -->
+<div class="relative w-48 h-48 mb-8 flex items-center justify-center">
+<!-- Tonal Layering Shapes -->
+<div class="absolute inset-0 bg-surface-container-low rounded-full opacity-40 scale-90 blur-xl"></div>
+<div class="relative flex flex-col items-center">
+<div class="w-24 h-32 bg-surface-container-lowest rounded-lg shadow-sm border border-outline-variant/10 flex flex-col p-3 gap-2 opacity-80">
+<div class="w-full h-1.5 bg-surface-variant/30 rounded-full"></div>
+<div class="w-4/5 h-1.5 bg-surface-variant/30 rounded-full"></div>
+<div class="w-2/3 h-1.5 bg-surface-variant/30 rounded-full"></div>
+<div class="mt-auto flex justify-end">
+<div class="w-6 h-6 rounded-full bg-primary/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary/30 text-xs" data-icon="edit_note">edit_note</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Empty State Text -->
+<div class="space-y-3">
+<h2 class="font-headline text-xl font-bold tracking-tight text-on-surface">
+                    暂时还没有公开问题
+                </h2>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">
+                    你仍然可以先提交自己的问题
+                </p>
+</div>
+<!-- Call to Action -->
+<div class="mt-10 w-full max-w-xs">
+<button class="group relative w-full flex items-center justify-center gap-3 bg-primary text-on-primary font-body font-medium py-3.5 px-8 rounded-full shadow-lg shadow-primary/10 hover:bg-primary-dim transition-all duration-300">
+<span class="material-symbols-outlined text-lg" data-icon="add_circle">add_circle</span>
+<span>去提问</span>
+</button>
+</div>
+</div>
+</main>
+</body></html>
