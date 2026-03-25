@@ -1,13 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { addClient, removeClient } from '../store/sse.js';
+import type { Request, Response } from 'express';
+import { requireAdminAuth } from '../middleware/adminAuth.js';
+import {
+  addAdminClient,
+  addBoardClient,
+  removeAdminClient,
+  removeBoardClient,
+} from '../store/sse.js';
 
 const HEARTBEAT_INTERVAL_MS = 15000;
 
 export function createEventsRouter(): Router {
   const router = Router();
 
-  router.get('/', (req, res) => {
+  function setupEventStream(
+    req: Request,
+    res: Response,
+    addClient: typeof addAdminClient,
+    removeClient: typeof removeAdminClient,
+  ): void {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
@@ -37,6 +49,14 @@ export function createEventsRouter(): Router {
       removeClient(clientId);
       res.end();
     });
+  }
+
+  router.get('/', requireAdminAuth, (req, res) => {
+    setupEventStream(req, res, addAdminClient, removeAdminClient);
+  });
+
+  router.get('/board', (req, res) => {
+    setupEventStream(req, res, addBoardClient, removeBoardClient);
   });
 
   return router;

@@ -1,8 +1,9 @@
-import { Pool, type QueryResult, type QueryResultRow } from 'pg';
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 import { config } from '../config.js';
 
 const QUESTIONS_TABLE_TOKEN = '{{questions}}';
 const SETTINGS_TABLE_TOKEN = '{{settings}}';
+const ADMIN_AUDIT_LOGS_TABLE_TOKEN = '{{admin_audit_logs}}';
 
 const pool = new Pool({
   host: config.database.host,
@@ -29,16 +30,39 @@ function getQualifiedSettingsTable(): string {
   )}`;
 }
 
+function getQualifiedAdminAuditLogsTable(): string {
+  return `${escapeIdentifier(config.database.schema)}.${escapeIdentifier(
+    `${config.database.tablePrefix}admin_audit_logs`,
+  )}`;
+}
+
 function compileSql(sql: string): string {
   return sql
     .replaceAll(QUESTIONS_TABLE_TOKEN, getQualifiedQuestionsTable())
-    .replaceAll(SETTINGS_TABLE_TOKEN, getQualifiedSettingsTable());
+    .replaceAll(SETTINGS_TABLE_TOKEN, getQualifiedSettingsTable())
+    .replaceAll(ADMIN_AUDIT_LOGS_TABLE_TOKEN, getQualifiedAdminAuditLogsTable());
+}
+
+type Queryable = Pool | PoolClient;
+
+export type SqlExecutor = <Row extends QueryResultRow>(
+  sql: string,
+  params?: unknown[],
+) => Promise<QueryResult<Row>>;
+
+async function executeQuery<Row extends QueryResultRow>(
+  client: Queryable,
+  sql: string,
+  params: unknown[] = [],
+): Promise<QueryResult<Row>> {
+  return client.query<Row>(compileSql(sql), params);
 }
 
 export async function initializeDatabase(): Promise<void> {
   const schema = escapeIdentifier(config.database.schema);
   const table = getQualifiedQuestionsTable();
   const settingsTable = getQualifiedSettingsTable();
+  const adminAuditLogsTable = getQualifiedAdminAuditLogsTable();
 
   await pool.query(`create schema if not exists ${schema}`);
   await pool.query(`
@@ -96,11 +120,59 @@ export async function initializeDatabase(): Promise<void> {
       on conflict (key) do nothing
     `,
   );
+  await pool.query(`
+    create table if not exists ${adminAuditLogsTable} (
+      id uuid primary key,
+      action varchar(64) not null,
+      resource_type varchar(64) not null,
+      resource_id varchar(120) not null default '',
+      actor_label varchar(120) not null,
+      auth_mode varchar(32) not null,
+      request_method varchar(16) not null,
+      request_path varchar(240) not null,
+      origin varchar(240) not null default '',
+      user_agent varchar(255) not null default '',
+      details_json jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create index if not exists ${escapeIdentifier(
+      `${config.database.tablePrefix}admin_audit_logs_created_at_idx`,
+    )}
+    on ${adminAuditLogsTable} (created_at desc)
+  `);
+  await pool.query(`
+    create index if not exists ${escapeIdentifier(
+      `${config.database.tablePrefix}admin_audit_logs_resource_idx`,
+    )}
+    on ${adminAuditLogsTable} (resource_type, resource_id, created_at desc)
+  `);
 }
 
-export async function query<Row extends QueryResultRow>(
+export const query: SqlExecutor = async <Row extends QueryResultRow>(
   sql: string,
   params: unknown[] = [],
-): Promise<QueryResult<Row>> {
-  return pool.query<Row>(compileSql(sql), params);
+): Promise<QueryResult<Row>> => {
+  return executeQuery<Row>(pool, sql, params);
+};
+
+export async function withTransaction<T>(callback: (execute: SqlExecutor) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+
+  try {
+    await client.query('begin');
+    const transactionalQuery: SqlExecutor = async <Row extends QueryResultRow>(
+      sql: string,
+      params: unknown[] = [],
+    ): Promise<QueryResult<Row>> => executeQuery<Row>(client, sql, params);
+    const result = await callback(transactionalQuery);
+    await client.query('commit');
+    return result;
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

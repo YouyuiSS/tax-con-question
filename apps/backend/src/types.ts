@@ -49,3 +49,25 @@ export type UpdateQuestionInput = {
 export type AppSettings = {
   autoPublishEnabled: boolean;
 };
+
+export type AdminAuthMode = 'shared_token';
+
+export type AdminAuditAction =
+  | 'question.updated'
+  | 'question.deleted'
+  | 'settings.updated';
+
+export type AdminAuditLog = {
+  id: string;
+  action: AdminAuditAction;
+  resourceType: string;
+  resourceId: string;
+  actorLabel: string;
+  authMode: AdminAuthMode;
+  requestMethod: string;
+  requestPath: string;
+  origin: string;
+  userAgent: string;
+  details: Record<string, unknown>;
+  createdAt: string;
+};

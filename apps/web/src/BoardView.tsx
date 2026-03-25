@@ -9,6 +9,7 @@ import {
 } from 'motion/react';
 import { Check, Globe, Grid2X2, Sparkles, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { adminFetch } from './lib/adminAuth';
 import { cn } from './lib/utils';
 
 type QuestionRoute = 'public_discuss' | 'meeting_only';
@@ -568,7 +569,7 @@ export function BoardView({
 
     async function loadQuestions() {
       try {
-        const response = await fetch('/api/questions');
+        const response = await fetch('/api/questions/board');
 
         if (!response.ok) {
           throw new Error('大屏数据加载失败。');
@@ -598,7 +599,7 @@ export function BoardView({
   }, []);
 
   useEffect(() => {
-    const eventSource = new EventSource('/api/events');
+    const eventSource = new EventSource('/api/events/board');
 
     eventSource.addEventListener('connected', () => {
       setConnectionState('live');
@@ -843,7 +844,7 @@ export function BoardView({
     setFocusedQuestionId((current) => (current === questionId ? null : current));
 
     try {
-      const response = await fetch(`/api/questions/${questionId}`, {
+      const response = await adminFetch(`/api/questions/${questionId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -855,7 +856,8 @@ export function BoardView({
       });
 
       if (!response.ok) {
-        throw new Error('标记已回答失败。');
+        const data = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(data?.message ?? '标记已回答失败。');
       }
 
       const updated = (await response.json()) as Question;
@@ -866,7 +868,7 @@ export function BoardView({
         setQuestions((previous) => upsertQuestion(previous, updated));
       }
     } catch (error) {
-      console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : '标记已回答失败。');
     } finally {
       setAnsweredQuestionIds((previous) => previous.filter((item) => item !== questionId));
     }

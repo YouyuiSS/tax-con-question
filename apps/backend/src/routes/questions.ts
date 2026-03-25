@@ -1,10 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { broadcast } from '../store/sse.js';
+import { requireAdminAuth } from '../middleware/adminAuth.js';
+import {
+  getAdminAuditContext,
+  toQuestionAdminFieldState,
+  toQuestionAuditSnapshot,
+} from '../lib/adminAudit.js';
+import { createAdminAuditLog } from '../store/adminAuditLogs.js';
+import { broadcastAdmin, broadcastBoard } from '../store/sse.js';
 import { getAppSettings } from '../store/settings.js';
+import { withTransaction } from '../store/db.js';
 import {
   createQuestion,
   deleteQuestionById,
+  getQuestionById,
   incrementQuestionCountById,
   listQuestions,
   updateQuestionById,
@@ -35,6 +44,10 @@ const ALLOWED_ANSWER_STATUSES: AnswerStatus[] = [
 const PUBLIC_TIME_BUCKET_MS = 30 * 60 * 1000;
 
 type PublicQuestionView = Pick<Question, 'id' | 'text' | 'tag' | 'route' | 'count' | 'createdAt'>;
+type BoardQuestionView = Pick<
+  Question,
+  'id' | 'text' | 'tag' | 'route' | 'displayStatus' | 'answerStatus' | 'count' | 'createdAt'
+>;
 
 function isQuestionRoute(value: string): value is QuestionRoute {
   return ALLOWED_ROUTES.includes(value as QuestionRoute);
@@ -46,6 +59,16 @@ function isDisplayStatus(value: string): value is DisplayStatus {
 
 function isAnswerStatus(value: string): value is AnswerStatus {
   return ALLOWED_ANSWER_STATUSES.includes(value as AnswerStatus);
+}
+
+function getQuestionIdParam(req: Request): string {
+  const value = req.params.id;
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return value?.[0] ?? '';
 }
 
 function bucketTimestamp(value: string): string {
@@ -65,6 +88,10 @@ function isPubliclyVisibleQuestion(question: Question, autoPublishEnabled: boole
     && (autoPublishEnabled || question.route === 'public_discuss');
 }
 
+function isBoardVisibleQuestion(question: Question): boolean {
+  return question.displayStatus !== 'archived';
+}
+
 function toPublicQuestionView(question: Question): PublicQuestionView {
   return {
     id: question.id,
@@ -74,6 +101,45 @@ function toPublicQuestionView(question: Question): PublicQuestionView {
     count: question.count ?? 1,
     createdAt: bucketTimestamp(question.createdAt),
   };
+}
+
+function toBoardQuestionView(question: Question): BoardQuestionView {
+  return {
+    id: question.id,
+    text: question.text,
+    tag: question.tag,
+    route: question.route,
+    displayStatus: question.displayStatus,
+    answerStatus: question.answerStatus,
+    count: question.count ?? 1,
+    createdAt: bucketTimestamp(question.createdAt),
+  };
+}
+
+function broadcastBoardQuestionCreated(question: Question): void {
+  if (!isBoardVisibleQuestion(question)) {
+    return;
+  }
+
+  broadcastBoard({
+    type: 'question.created',
+    payload: toBoardQuestionView(question),
+  });
+}
+
+function broadcastBoardQuestionUpdated(question: Question): void {
+  if (!isBoardVisibleQuestion(question)) {
+    broadcastBoard({
+      type: 'question.deleted',
+      payload: { id: question.id },
+    });
+    return;
+  }
+
+  broadcastBoard({
+    type: 'question.updated',
+    payload: toBoardQuestionView(question),
+  });
 }
 
 function parseCreateQuestionInput(body: unknown): CreateQuestionInput {
@@ -171,7 +237,20 @@ export function createQuestionsRouter(): Router {
     }
   });
 
-  router.get('/', async (req, res, next) => {
+  router.get('/board', async (_req, res, next) => {
+    try {
+      const items = await listQuestions();
+      const visibleItems = items
+        .filter(isBoardVisibleQuestion)
+        .map(toBoardQuestionView);
+
+      res.json({ items: visibleItems });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/', requireAdminAuth, async (req, res, next) => {
     try {
       const route = typeof req.query.route === 'string' ? req.query.route : '';
       const displayStatus = typeof req.query.displayStatus === 'string'
@@ -219,7 +298,8 @@ export function createQuestionsRouter(): Router {
         payload: question,
       };
 
-      broadcast(event);
+      broadcastAdmin(event);
+      broadcastBoardQuestionCreated(question);
       res.status(201).json(question);
     } catch (error) {
       next(error);
@@ -228,7 +308,7 @@ export function createQuestionsRouter(): Router {
 
   router.post('/:id/care', async (req, res, next) => {
     try {
-      const updated = await incrementQuestionCountById(req.params.id);
+      const updated = await incrementQuestionCountById(getQuestionIdParam(req));
 
       if (!updated) {
         res.status(404).json({ message: 'Question not found.' });
@@ -247,17 +327,52 @@ export function createQuestionsRouter(): Router {
         payload: updated,
       };
 
-      broadcast(event);
+      broadcastAdmin(event);
+      broadcastBoardQuestionUpdated(updated);
       res.json(toPublicQuestionView(updated));
     } catch (error) {
       next(error);
     }
   });
 
-  router.patch('/:id', async (req, res, next) => {
+  router.patch('/:id', requireAdminAuth, async (req, res, next) => {
     try {
       const input = parseUpdateQuestionInput(req.body);
-      const updated = await updateQuestionById(req.params.id, input);
+      const questionId = getQuestionIdParam(req);
+      const auditContext = getAdminAuditContext(req);
+      const changedFields = ['tag', 'displayStatus', 'answerStatus'].filter((field) =>
+        Object.hasOwn(input, field),
+      );
+      const updated = await withTransaction(async (execute) => {
+        const previous = await getQuestionById(questionId, execute);
+
+        if (!previous) {
+          return null;
+        }
+
+        const nextQuestion = await updateQuestionById(questionId, input, execute);
+
+        if (!nextQuestion) {
+          return null;
+        }
+
+        await createAdminAuditLog(
+          {
+            ...auditContext,
+            action: 'question.updated',
+            resourceType: 'question',
+            resourceId: nextQuestion.id,
+            details: {
+              changedFields,
+              before: toQuestionAdminFieldState(previous),
+              after: toQuestionAdminFieldState(nextQuestion),
+            },
+          },
+          execute,
+        );
+
+        return nextQuestion;
+      });
 
       if (!updated) {
         res.status(404).json({ message: 'Question not found.' });
@@ -269,16 +384,40 @@ export function createQuestionsRouter(): Router {
         payload: updated,
       };
 
-      broadcast(event);
+      broadcastAdmin(event);
+      broadcastBoardQuestionUpdated(updated);
       res.json(updated);
     } catch (error) {
       next(error);
     }
   });
 
-  router.delete('/:id', async (req, res, next) => {
+  router.delete('/:id', requireAdminAuth, async (req, res, next) => {
     try {
-      const deleted = await deleteQuestionById(req.params.id);
+      const questionId = getQuestionIdParam(req);
+      const auditContext = getAdminAuditContext(req);
+      const deleted = await withTransaction(async (execute) => {
+        const removed = await deleteQuestionById(questionId, execute);
+
+        if (!removed) {
+          return null;
+        }
+
+        await createAdminAuditLog(
+          {
+            ...auditContext,
+            action: 'question.deleted',
+            resourceType: 'question',
+            resourceId: removed.id,
+            details: {
+              snapshot: toQuestionAuditSnapshot(removed),
+            },
+          },
+          execute,
+        );
+
+        return removed;
+      });
 
       if (!deleted) {
         res.status(404).json({ message: 'Question not found.' });
@@ -290,7 +429,11 @@ export function createQuestionsRouter(): Router {
         payload: { id: deleted.id },
       };
 
-      broadcast(event);
+      broadcastAdmin(event);
+      broadcastBoard({
+        type: 'question.deleted',
+        payload: { id: deleted.id },
+      });
       res.json({ ok: true, id: deleted.id });
     } catch (error) {
       next(error);

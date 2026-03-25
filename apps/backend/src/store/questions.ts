@@ -1,4 +1,4 @@
-import { query } from './db.js';
+import { query, type SqlExecutor } from './db.js';
 import type {
   DisplayStatus,
   Question,
@@ -35,6 +35,7 @@ function mapQuestionRow(row: QuestionRow): Question {
 export async function listQuestions(
   route?: QuestionRoute,
   displayStatus?: DisplayStatus,
+  execute: SqlExecutor = query,
 ): Promise<Question[]> {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -52,7 +53,7 @@ export async function listQuestions(
   const whereClause = conditions.length > 0
     ? `where ${conditions.join(' and ')}`
     : '';
-  const result = await query<QuestionRow>(
+  const result = await execute<QuestionRow>(
     `
       select id, text, tag, route, display_status, answer_status, count, created_at, updated_at
       from {{questions}}
@@ -98,8 +99,31 @@ export async function createQuestion(question: Question): Promise<Question> {
   return mapQuestionRow(result.rows[0]);
 }
 
-export async function deleteQuestionById(id: string): Promise<Question | null> {
-  const result = await query<QuestionRow>(
+export async function getQuestionById(
+  id: string,
+  execute: SqlExecutor = query,
+): Promise<Question | null> {
+  const result = await execute<QuestionRow>(
+    `
+      select id, text, tag, route, display_status, answer_status, count, created_at, updated_at
+      from {{questions}}
+      where id = $1
+    `,
+    [id],
+  );
+
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  return mapQuestionRow(result.rows[0]);
+}
+
+export async function deleteQuestionById(
+  id: string,
+  execute: SqlExecutor = query,
+): Promise<Question | null> {
+  const result = await execute<QuestionRow>(
     `
       delete from {{questions}}
       where id = $1
@@ -115,8 +139,11 @@ export async function deleteQuestionById(id: string): Promise<Question | null> {
   return mapQuestionRow(result.rows[0]);
 }
 
-export async function incrementQuestionCountById(id: string): Promise<Question | null> {
-  const result = await query<QuestionRow>(
+export async function incrementQuestionCountById(
+  id: string,
+  execute: SqlExecutor = query,
+): Promise<Question | null> {
+  const result = await execute<QuestionRow>(
     `
       update {{questions}}
       set count = count + 1,
@@ -137,6 +164,7 @@ export async function incrementQuestionCountById(id: string): Promise<Question |
 export async function updateQuestionById(
   id: string,
   updates: UpdateQuestionInput,
+  execute: SqlExecutor = query,
 ): Promise<Question | null> {
   const assignments: string[] = [];
   const params: unknown[] = [];
@@ -162,7 +190,7 @@ export async function updateQuestionById(
 
   params.push(id);
 
-  const result = await query<QuestionRow>(
+  const result = await execute<QuestionRow>(
     `
       update {{questions}}
       set ${assignments.join(', ')},

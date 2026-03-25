@@ -1,4 +1,8 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
+import { requireAdminAuth } from '../middleware/adminAuth.js';
+import { getAdminAuditContext } from '../lib/adminAudit.js';
+import { createAdminAuditLog } from '../store/adminAuditLogs.js';
+import { withTransaction } from '../store/db.js';
 import { getAppSettings, updateAppSettings } from '../store/settings.js';
 import type { AppSettings } from '../types.js';
 
@@ -37,10 +41,32 @@ export function createSettingsRouter(): Router {
     }
   });
 
-  router.patch('/', async (req, res, next) => {
+  router.patch('/', requireAdminAuth, async (req, res, next) => {
     try {
       const updates = parseSettingsInput(req.body);
-      const settings = await updateAppSettings(updates);
+      const auditContext = getAdminAuditContext(req);
+      const settings = await withTransaction(async (execute) => {
+        const before = await getAppSettings(execute);
+        const nextSettings = await updateAppSettings(updates, execute);
+        const changedKeys = Object.keys(updates);
+
+        await createAdminAuditLog(
+          {
+            ...auditContext,
+            action: 'settings.updated',
+            resourceType: 'app_settings',
+            resourceId: 'global',
+            details: {
+              changedKeys,
+              before,
+              after: nextSettings,
+            },
+          },
+          execute,
+        );
+
+        return nextSettings;
+      });
       res.json(settings);
     } catch (error) {
       next(error);

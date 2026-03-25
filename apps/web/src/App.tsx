@@ -20,6 +20,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
+import { adminFetch } from './lib/adminAuth';
 import { cn } from './lib/utils';
 import { BoardView } from './BoardView';
 
@@ -46,11 +47,6 @@ type Question = {
   createdAt: string;
   updatedAt: string;
 };
-
-type QuestionEvent =
-  | { type: 'question.created'; payload: Question }
-  | { type: 'question.updated'; payload: Question }
-  | { type: 'question.deleted'; payload: { id: string } };
 
 type FilterState = {
   keyword: string;
@@ -123,14 +119,6 @@ const DEFAULT_FILTERS: FilterState = {
 
 function isArchivedStatus(status: DisplayStatus): boolean {
   return status === 'archived';
-}
-
-function parseQuestionEvent(raw: string): QuestionEvent | null {
-  try {
-    return JSON.parse(raw) as QuestionEvent;
-  } catch (_error) {
-    return null;
-  }
 }
 
 function upsertQuestion(list: Question[], question: Question): Question[] {
@@ -208,6 +196,7 @@ function StatusBadge({
 }
 
 function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
+  const POLL_INTERVAL_MS = 10000;
   const [questions, setQuestions] = useState<Question[]>([]);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [loadingState, setLoadingState] = useState<LoadingState>('loading');
@@ -229,7 +218,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
     }
 
     try {
-      const response = await fetch('/api/questions');
+      const response = await adminFetch('/api/questions');
       const data = (await response.json()) as { items?: Question[]; message?: string };
 
       if (!response.ok || !data.items) {
@@ -239,11 +228,13 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
       startTransition(() => {
         setQuestions(data.items ?? []);
         setLoadingState('ready');
+        setConnectionState('live');
         setErrorMessage('');
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : '问题列表加载失败。';
       setErrorMessage(message);
+      setConnectionState('error');
 
       if (mode === 'initial') {
         setLoadingState('error');
@@ -260,62 +251,12 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
   }, []);
 
   useEffect(() => {
-    const eventSource = new EventSource('/api/events');
-
-    eventSource.addEventListener('connected', () => {
-      setConnectionState('live');
-    });
-
-    eventSource.addEventListener('ping', () => {
-      setConnectionState('live');
-    });
-
-    eventSource.addEventListener('question.created', (event) => {
-      const parsed = parseQuestionEvent((event as MessageEvent<string>).data);
-
-      if (!parsed || parsed.type !== 'question.created') {
-        return;
-      }
-
-      setActionMessage('刚刚收到一条新问题，已加入问题列表。');
-      setActionError('');
-      startTransition(() => {
-        setQuestions((previous) => upsertQuestion(previous, parsed.payload));
-      });
-    });
-
-    eventSource.addEventListener('question.updated', (event) => {
-      const parsed = parseQuestionEvent((event as MessageEvent<string>).data);
-
-      if (!parsed || parsed.type !== 'question.updated') {
-        return;
-      }
-
-      startTransition(() => {
-        setQuestions((previous) => upsertQuestion(previous, parsed.payload));
-      });
-    });
-
-    eventSource.addEventListener('question.deleted', (event) => {
-      const parsed = parseQuestionEvent((event as MessageEvent<string>).data);
-
-      if (!parsed || parsed.type !== 'question.deleted') {
-        return;
-      }
-
-      startTransition(() => {
-        setQuestions((previous) =>
-          previous.filter((item) => item.id !== parsed.payload.id),
-        );
-      });
-    });
-
-    eventSource.onerror = () => {
-      setConnectionState('error');
-    };
+    const timer = window.setInterval(() => {
+      void loadQuestions('refresh');
+    }, POLL_INTERVAL_MS);
 
     return () => {
-      eventSource.close();
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -450,7 +391,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
     setActionError('');
 
     try {
-      const response = await fetch(`/api/questions/${questionId}`, {
+      const response = await adminFetch(`/api/questions/${questionId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -51,6 +51,21 @@ Optional variables:
 - `DB_SCHEMA`
 - `TABLE_PREFIX`
 - `PORT`
+- `ADMIN_TOKEN` for management write APIs
+- `ADMIN_AUDIT_LOG_LIMIT` for the maximum number of audit log rows returned per request
+- `CORS_ALLOWED_ORIGINS` as a comma-separated allowlist for cross-origin browser access
+
+Notes:
+
+- Same-origin requests are always allowed.
+- In non-production local development, the backend also allows `http://localhost:3100`, `http://127.0.0.1:3100`, `http://localhost:3101`, and `http://127.0.0.1:3101` by default.
+- In production, set `CORS_ALLOWED_ORIGINS` explicitly if `web` or `h5` are served from a different origin than the backend.
+
+## Admin Audit Logs
+
+- Management write APIs now create audit records in PostgreSQL.
+- The backend exposes `GET /api/admin/audit-logs` with `Authorization: Bearer <ADMIN_TOKEN>`.
+- The `web` app prompts once per browser session for an operator label and sends it as `X-Admin-Actor` to make shared-token audit records easier to distinguish.
 
 ## One-Click ECS Deploy
 

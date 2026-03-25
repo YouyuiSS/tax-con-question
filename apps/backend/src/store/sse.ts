@@ -1,22 +1,40 @@
-import type { QuestionEvent } from '../types.js';
+export type SseEvent = {
+  type: string;
+  payload: unknown;
+};
 
 export type SseClient = {
   id: string;
-  send: (event: QuestionEvent) => void;
+  send: (event: SseEvent) => void;
 };
 
-const clients = new Map<string, SseClient>();
+const adminClients = new Map<string, SseClient>();
+const boardClients = new Map<string, SseClient>();
 
-export function addClient(client: SseClient): void {
-  clients.set(client.id, client);
+export function addAdminClient(client: SseClient): void {
+  adminClients.set(client.id, client);
 }
 
-export function removeClient(id: string): void {
-  clients.delete(id);
+export function removeAdminClient(id: string): void {
+  adminClients.delete(id);
 }
 
-export function broadcast(event: QuestionEvent): void {
-  clients.forEach((client) => {
+export function addBoardClient(client: SseClient): void {
+  boardClients.set(client.id, client);
+}
+
+export function removeBoardClient(id: string): void {
+  boardClients.delete(id);
+}
+
+export function broadcastAdmin(event: SseEvent): void {
+  adminClients.forEach((client) => {
+    client.send(event);
+  });
+}
+
+export function broadcastBoard(event: SseEvent): void {
+  boardClients.forEach((client) => {
     client.send(event);
   });
 }

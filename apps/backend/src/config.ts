@@ -14,6 +14,9 @@ type DatabaseConfig = {
 
 type AppConfig = {
   port: number;
+  adminToken: string;
+  corsAllowedOrigins: string[];
+  adminAuditLogLimit: number;
   database: DatabaseConfig;
 };
 
@@ -37,6 +40,32 @@ dotenv.config({
 function toNumber(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseCommaSeparatedList(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function resolveCorsAllowedOrigins(): string[] {
+  const configuredOrigins = parseCommaSeparatedList(process.env.CORS_ALLOWED_ORIGINS);
+
+  if (configuredOrigins.length > 0) {
+    return configuredOrigins;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return [];
+  }
+
+  return [
+    'http://localhost:3100',
+    'http://127.0.0.1:3100',
+    'http://localhost:3101',
+    'http://127.0.0.1:3101',
+  ];
 }
 
 function parseJdbcDatabaseUrl(value: string): ParsedJdbcUrl {
@@ -104,5 +133,8 @@ function resolveDatabaseConfig(): DatabaseConfig {
 
 export const config: AppConfig = {
   port: toNumber(process.env.PORT, 4000),
+  adminToken: process.env.ADMIN_TOKEN?.trim() ?? '',
+  corsAllowedOrigins: resolveCorsAllowedOrigins(),
+  adminAuditLogLimit: Math.min(Math.max(toNumber(process.env.ADMIN_AUDIT_LOG_LIMIT, 200), 20), 1000),
   database: resolveDatabaseConfig(),
 };

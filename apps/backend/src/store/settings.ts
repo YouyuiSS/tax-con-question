@@ -1,4 +1,4 @@
-import { query } from './db.js';
+import { query, type SqlExecutor } from './db.js';
 import type { AppSettings } from '../types.js';
 
 type SettingRow = {
@@ -8,8 +8,8 @@ type SettingRow = {
 
 const AUTO_PUBLISH_KEY = 'auto_publish_enabled';
 
-export async function getAppSettings(): Promise<AppSettings> {
-  const result = await query<SettingRow>(
+export async function getAppSettings(execute: SqlExecutor = query): Promise<AppSettings> {
+  const result = await execute<SettingRow>(
     `
       select key, value_boolean
       from {{settings}}
@@ -25,9 +25,10 @@ export async function getAppSettings(): Promise<AppSettings> {
 
 export async function updateAppSettings(
   updates: Partial<AppSettings>,
+  execute: SqlExecutor = query,
 ): Promise<AppSettings> {
   if (updates.autoPublishEnabled !== undefined) {
-    await query(
+    await execute(
       `
         insert into {{settings}} (key, value_boolean, updated_at)
         values ($1, $2, now())
@@ -39,5 +40,5 @@ export async function updateAppSettings(
     );
   }
 
-  return getAppSettings();
+  return getAppSettings(execute);
 }
