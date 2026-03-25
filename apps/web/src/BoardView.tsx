@@ -7,12 +7,13 @@ import {
   useTransform,
   type MotionValue,
 } from 'motion/react';
-import { Globe, Grid2X2, Sparkles } from 'lucide-react';
+import { Check, Globe, Grid2X2, Sparkles, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { cn } from './lib/utils';
 
 type QuestionRoute = 'public_discuss' | 'meeting_only';
 type DisplayStatus = 'pending' | 'show_raw' | 'count_only' | 'redirect_official' | 'archived';
+type AnswerStatus = 'unanswered' | 'answered_live' | 'answered_post';
 type SortType = 'count' | 'date';
 type ViewMode = 'grid' | 'globe';
 type ConnectionState = 'connecting' | 'live' | 'error';
@@ -30,8 +31,10 @@ type GlobeLayout = {
 type Question = {
   id: string;
   text: string;
+  tag: string;
   route: QuestionRoute;
   displayStatus: DisplayStatus;
+  answerStatus: AnswerStatus;
   count?: number;
   createdAt: string;
 };
@@ -42,6 +45,7 @@ type QuestionEvent =
   | { type: 'question.deleted'; payload: { id: string } };
 
 const HIGHLIGHT_DURATION_MS = 2600;
+const ALL_TAGS = '全部';
 
 const ROUTE_LABEL: Record<QuestionRoute, string> = {
   public_discuss: '公开问题',
@@ -49,7 +53,7 @@ const ROUTE_LABEL: Record<QuestionRoute, string> = {
 };
 
 function isVisibleOnBoard(question: Question): boolean {
-  return question.displayStatus === 'show_raw';
+  return question.displayStatus !== 'archived';
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -143,6 +147,10 @@ function parseQuestionEvent(raw: string): QuestionEvent | null {
   }
 }
 
+function isAnswered(question: Pick<Question, 'answerStatus'>): boolean {
+  return question.answerStatus !== 'unanswered';
+}
+
 function upsertQuestion(list: Question[], question: Question): Question[] {
   const exists = list.some((item) => item.id === question.id);
 
@@ -157,10 +165,14 @@ function QuestionCard({
   q,
   viewMode,
   nowTimestamp,
+  onClick,
+  focused = false,
 }: {
   q: Question;
   viewMode: ViewMode;
   nowTimestamp: number;
+  onClick?: () => void;
+  focused?: boolean;
 }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -187,6 +199,17 @@ function QuestionCard({
     y.set(0);
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (!onClick) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick();
+    }
+  }
+
   return (
     <motion.article
       layout={viewMode === 'grid'}
@@ -200,10 +223,15 @@ function QuestionCard({
       style={viewMode === 'grid' ? { rotateX, rotateY, transformPerspective: 1000 } : {}}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
       className={cn(
         'glass-card holo-sweep relative flex flex-col justify-between rounded-3xl transition-colors duration-500',
         getCardSizeClass(count),
-        'hover:border-white/30',
+        focused ? 'border-cyan-300/38 shadow-[0_0_42px_rgba(34,211,238,0.18)]' : 'hover:border-white/30',
+        onClick && 'cursor-pointer hover:-translate-y-1',
       )}
     >
       <div className="relative z-10">
@@ -221,6 +249,96 @@ function QuestionCard({
         <span className="text-white/72">{count}人关心</span>
       </div>
     </motion.article>
+  );
+}
+
+function FocusedQuestionOverlay({
+  question,
+  nowTimestamp,
+  onClose,
+  onMarkAnswered,
+  markingAnswered = false,
+}: {
+  question: Question;
+  nowTimestamp: number;
+  onClose: () => void;
+  onMarkAnswered: () => void;
+  markingAnswered?: boolean;
+}) {
+  const count = question.count ?? 1;
+  const tag = question.tag.trim() || '未分类';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+      animate={{ opacity: 1, backdropFilter: 'blur(16px)' }}
+      exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+      className="fixed inset-0 z-[35] flex items-center justify-center bg-slate-950/38 px-10"
+    >
+      <button
+        type="button"
+        aria-label="关闭聚焦展示"
+        onClick={onClose}
+        className="absolute inset-0"
+      />
+
+      <motion.section
+        initial={{ scale: 0.84, y: 48, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.94, opacity: 0, filter: 'blur(12px)' }}
+        transition={{ type: 'spring', stiffness: 200, damping: 24 }}
+        className="glass-card relative z-10 w-[88vw] max-w-6xl overflow-hidden rounded-[3rem] border border-cyan-300/24 p-12 shadow-[0_0_80px_rgba(34,211,238,0.14)]"
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/8 via-transparent to-blue-500/8" />
+
+        <div className="relative z-10 flex flex-wrap items-center gap-3 text-sm">
+          <span className="rounded-full border border-white/14 bg-white/8 px-4 py-2 text-white/78">
+            {tag}
+          </span>
+          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-cyan-100">
+            {ROUTE_LABEL[question.route]}
+          </span>
+        </div>
+
+        <h2 className="relative z-10 mt-8 text-5xl font-bold leading-[1.28] text-white drop-shadow-[0_0_28px_rgba(255,255,255,0.08)]">
+          {question.text}
+        </h2>
+
+        <div className="relative z-10 mt-10 grid grid-cols-[1fr_auto_1fr] items-center gap-6 border-t border-white/10 pt-5 text-base">
+          <time className="justify-self-start text-white/45">
+            {formatQuestionTime(question.createdAt, nowTimestamp)}
+          </time>
+
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/6 px-4 py-2 text-sm font-semibold text-white/72 transition hover:border-white/18 hover:bg-white/8 hover:text-white/88"
+            >
+              <X className="h-4 w-4" />
+              <span>关闭</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onMarkAnswered}
+              disabled={markingAnswered}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition',
+                markingAnswered
+                  ? 'cursor-wait border-cyan-300/16 bg-cyan-300/10 text-cyan-100/70'
+                  : 'border-cyan-300/24 bg-cyan-300/12 text-cyan-100/92 hover:border-cyan-300/36 hover:bg-cyan-300/16',
+              )}
+            >
+              <Check className="h-4 w-4" />
+              <span>{markingAnswered ? '处理中...' : '已回答'}</span>
+            </button>
+          </div>
+
+          <span className="justify-self-end text-white/72">{count}人关心</span>
+        </div>
+      </motion.section>
+    </motion.div>
   );
 }
 
@@ -315,18 +433,23 @@ export function BoardView({
   const [questions, setQuestions] = useState<Question[]>([]);
   const [highlightedQuestion, setHighlightedQuestion] = useState<Question | null>(null);
   const [incomingQueue, setIncomingQueue] = useState<Question[]>([]);
-  const [sortType, setSortType] = useState<SortType>('date');
+  const [sortType, setSortType] = useState<SortType>('count');
   const [viewMode, setViewMode] = useState<ViewMode>('globe');
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [loadingState, setLoadingState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [isGlobeHovered, setIsGlobeHovered] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+  const [selectedTag, setSelectedTag] = useState(ALL_TAGS);
+  const [focusedQuestionId, setFocusedQuestionId] = useState<string | null>(null);
+  const [answeredQuestionIds, setAnsweredQuestionIds] = useState<string[]>([]);
+  const [answeredCount, setAnsweredCount] = useState(0);
   const globalRotation = useMotionValue(0);
   const isPlayingIncomingRef = useRef(false);
   const questionsRef = useRef<Question[]>([]);
   const incomingQueueRef = useRef<Question[]>([]);
   const highlightedQuestionRef = useRef<Question | null>(null);
+  const questionStatusRef = useRef<Map<string, AnswerStatus>>(new Map());
   const globeContainerRef = useRef<HTMLDivElement | null>(null);
   const [globeLayout, setGlobeLayout] = useState<GlobeLayout>({
     horizontalRadius: 560,
@@ -366,6 +489,43 @@ export function BoardView({
   useEffect(() => {
     highlightedQuestionRef.current = highlightedQuestion;
   }, [highlightedQuestion]);
+
+  function replaceQuestionSnapshots(items: Question[]) {
+    questionStatusRef.current = new Map(items.map((item) => [item.id, item.answerStatus]));
+    setAnsweredCount(items.filter(isAnswered).length);
+  }
+
+  function upsertQuestionSnapshot(question: Question) {
+    const previousStatus = questionStatusRef.current.get(question.id);
+    questionStatusRef.current.set(question.id, question.answerStatus);
+
+    if (previousStatus === question.answerStatus) {
+      return;
+    }
+
+    const wasAnswered = previousStatus !== undefined && previousStatus !== 'unanswered';
+    const isNowAnswered = question.answerStatus !== 'unanswered';
+
+    if (wasAnswered === isNowAnswered) {
+      return;
+    }
+
+    setAnsweredCount((current) => current + (isNowAnswered ? 1 : -1));
+  }
+
+  function removeQuestionSnapshot(questionId: string) {
+    const previousStatus = questionStatusRef.current.get(questionId);
+
+    if (previousStatus === undefined) {
+      return;
+    }
+
+    questionStatusRef.current.delete(questionId);
+
+    if (previousStatus !== 'unanswered') {
+      setAnsweredCount((current) => Math.max(0, current - 1));
+    }
+  }
 
   useEffect(() => {
     if (viewMode !== 'globe') {
@@ -417,6 +577,7 @@ export function BoardView({
         const data = (await response.json()) as { items: Question[] };
 
         if (!isCancelled) {
+          replaceQuestionSnapshots(data.items);
           setQuestions(data.items.filter(isVisibleOnBoard));
           setLoadingState('ready');
           setErrorMessage('');
@@ -450,7 +611,13 @@ export function BoardView({
     eventSource.addEventListener('question.created', (event) => {
       const parsed = parseQuestionEvent((event as MessageEvent<string>).data);
 
-      if (!parsed || parsed.type !== 'question.created' || !isVisibleOnBoard(parsed.payload)) {
+      if (!parsed || parsed.type !== 'question.created') {
+        return;
+      }
+
+      upsertQuestionSnapshot(parsed.payload);
+
+      if (!isVisibleOnBoard(parsed.payload)) {
         return;
       }
 
@@ -469,6 +636,8 @@ export function BoardView({
       if (!parsed || parsed.type !== 'question.updated') {
         return;
       }
+
+      upsertQuestionSnapshot(parsed.payload);
 
       if (!isVisibleOnBoard(parsed.payload)) {
         setQuestions((previous) =>
@@ -507,6 +676,8 @@ export function BoardView({
       if (!parsed || parsed.type !== 'question.deleted') {
         return;
       }
+
+      removeQuestionSnapshot(parsed.payload.id);
 
       setQuestions((previous) =>
         previous.filter((item) => item.id !== parsed.payload.id),
@@ -576,6 +747,131 @@ export function BoardView({
     });
   }, [effectiveSortType, questions]);
 
+  const groupedQuestions = useMemo(() => {
+    const groups = new Map<string, Question[]>();
+
+    for (const question of sortedQuestions) {
+      const tag = question.tag.trim() || '未分类';
+      const existing = groups.get(tag);
+
+      if (existing) {
+        existing.push(question);
+      } else {
+        groups.set(tag, [question]);
+      }
+    }
+
+    return Array.from(groups.entries()).map(([tag, items]) => ({
+      tag,
+      items,
+      count: items.length,
+      totalCare: items.reduce((sum, item) => sum + (item.count ?? 1), 0),
+    }));
+  }, [sortedQuestions]);
+
+  const tagOptions = useMemo(
+    () => [
+      {
+        tag: ALL_TAGS,
+        count: sortedQuestions.length,
+        totalCare: sortedQuestions.reduce((sum, item) => sum + (item.count ?? 1), 0),
+      },
+      ...groupedQuestions,
+    ],
+    [groupedQuestions, sortedQuestions],
+  );
+
+  useEffect(() => {
+    if (!tagOptions.some((option) => option.tag === selectedTag)) {
+      setSelectedTag(ALL_TAGS);
+    }
+  }, [selectedTag, tagOptions]);
+
+  useEffect(() => {
+    if (viewMode !== 'grid') {
+      setFocusedQuestionId(null);
+    }
+  }, [viewMode]);
+
+  const gridQuestions = useMemo(() => {
+    if (selectedTag === ALL_TAGS) {
+      return sortedQuestions;
+    }
+
+    return sortedQuestions.filter((question) => (question.tag.trim() || '未分类') === selectedTag);
+  }, [selectedTag, sortedQuestions]);
+
+  const focusedQuestion = useMemo(
+    () => questions.find((question) => question.id === focusedQuestionId) ?? null,
+    [focusedQuestionId, questions],
+  );
+
+  useEffect(() => {
+    if (!focusedQuestionId) {
+      return;
+    }
+
+    if (!focusedQuestion) {
+      setFocusedQuestionId(null);
+    }
+  }, [focusedQuestion, focusedQuestionId]);
+
+  useEffect(() => {
+    if (!focusedQuestionId) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setFocusedQuestionId(null);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [focusedQuestionId]);
+
+  async function markQuestionAnswered(questionId: string) {
+    if (answeredQuestionIds.includes(questionId)) {
+      return;
+    }
+
+    setAnsweredQuestionIds((previous) => [...previous, questionId]);
+    setFocusedQuestionId((current) => (current === questionId ? null : current));
+
+    try {
+      const response = await fetch(`/api/questions/${questionId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          answerStatus: 'answered_live',
+          displayStatus: 'archived',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('标记已回答失败。');
+      }
+
+      const updated = (await response.json()) as Question;
+
+      if (!isVisibleOnBoard(updated)) {
+        setQuestions((previous) => previous.filter((item) => item.id !== questionId));
+      } else {
+        setQuestions((previous) => upsertQuestion(previous, updated));
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setAnsweredQuestionIds((previous) => previous.filter((item) => item !== questionId));
+    }
+  }
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-mesh font-sans text-white selection:bg-cyan-500/20">
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
@@ -584,18 +880,14 @@ export function BoardView({
         <div className="orb h-[30vw] w-[30vw] animate-[float_32s_infinite_alternate] bg-sky-500/12 left-[42%] top-[42%]" />
       </div>
 
-      <header className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between p-8">
+      <header className="pointer-events-none absolute left-0 right-0 top-0 z-30 flex items-start justify-between px-8 pb-8 pt-4">
         <div>
-          <p className="mb-2 text-sm uppercase tracking-[0.24em] text-cyan-100/60">
-            Real-time Board
-          </p>
-          <h1 className="text-4xl font-black tracking-tight text-white drop-shadow-[0_0_18px_rgba(34,211,238,0.22)]">
-            全员大会答疑
+          <h1 className="text-5xl font-black leading-[0.92] tracking-tight text-white drop-shadow-[0_0_18px_rgba(34,211,238,0.22)] xl:text-6xl">
+            问政税务
           </h1>
-          <p className="mt-3 text-sm text-white/55">仅展示已标记为“原文可展示”的问题。</p>
         </div>
 
-        <div className="absolute left-1/2 top-8 -translate-x-1/2">
+        <div className="pointer-events-auto absolute left-1/2 top-8 -translate-x-1/2">
           <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/6 p-1.5 backdrop-blur-md">
               <button
@@ -635,18 +927,6 @@ export function BoardView({
               <button
                 className={cn(
                   'min-w-[4.5rem] whitespace-nowrap rounded-xl px-5 py-2 text-sm font-semibold transition-all',
-                  sortType === 'date'
-                    ? 'bg-white/12 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.12)]'
-                    : 'text-white/50 hover:bg-white/6 hover:text-white/80',
-                )}
-                onClick={() => setSortType('date')}
-                tabIndex={viewMode === 'grid' ? 0 : -1}
-              >
-                最新
-              </button>
-              <button
-                className={cn(
-                  'min-w-[4.5rem] whitespace-nowrap rounded-xl px-5 py-2 text-sm font-semibold transition-all',
                   sortType === 'count'
                     ? 'bg-white/12 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.12)]'
                     : 'text-white/50 hover:bg-white/6 hover:text-white/80',
@@ -655,6 +935,18 @@ export function BoardView({
                 tabIndex={viewMode === 'grid' ? 0 : -1}
               >
                 关注度
+              </button>
+              <button
+                className={cn(
+                  'min-w-[4.5rem] whitespace-nowrap rounded-xl px-5 py-2 text-sm font-semibold transition-all',
+                  sortType === 'date'
+                    ? 'bg-white/12 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.12)]'
+                    : 'text-white/50 hover:bg-white/6 hover:text-white/80',
+                )}
+                onClick={() => setSortType('date')}
+                tabIndex={viewMode === 'grid' ? 0 : -1}
+              >
+                最新
               </button>
             </div>
           </div>
@@ -687,8 +979,16 @@ export function BoardView({
                 ? '连接中'
                 : '连接异常'}
           </div>
-          <p className="text-5xl font-mono font-black text-white">{questions.length}</p>
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/45">Visible Questions</p>
+          <div className="space-y-4">
+            <div>
+              <p className="text-5xl font-mono font-black text-white">{questions.length}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/45">Visible Questions</p>
+            </div>
+            <div className="border-t border-white/8 pt-3">
+              <p className="text-4xl font-mono font-black text-cyan-100">{answeredCount}</p>
+              <p className="text-[11px] font-bold tracking-[0.24em] text-cyan-100/52">ANSWERED</p>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -712,27 +1012,62 @@ export function BoardView({
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-cyan-300/12 text-cyan-200">
                 <Sparkles className="h-7 w-7" />
               </div>
-              <h2 className="mb-3 text-3xl font-bold text-white">等待可展示问题进入现场</h2>
+              <h2 className="mb-3 text-3xl font-bold text-white">等待新问题进入现场</h2>
               <p className="text-base leading-8 text-white/68">
-                管理页将问题标记为“原文可展示”后，它会自动出现在这里。
+                新提交的问题会直接出现在这里，归档后会从大屏移出。
               </p>
             </div>
           </div>
         ) : viewMode === 'grid' ? (
           <motion.div
             layout
-            className="mx-auto flex h-full max-w-[1760px] flex-wrap content-center justify-center gap-8 overflow-hidden px-8 pb-12 pt-32"
+            className="mx-auto h-full max-w-[1760px] overflow-y-auto px-8 pb-12 pt-32"
           >
-            <AnimatePresence mode="popLayout">
-              {sortedQuestions.map((question) => (
-                <QuestionCard
-                  key={question.id}
-                  q={question}
-                  viewMode="grid"
-                  nowTimestamp={nowTimestamp}
-                />
-              ))}
-            </AnimatePresence>
+            <div className="space-y-8 pb-8">
+              {groupedQuestions.length > 0 ? (
+                <div className="sticky top-0 z-10 -mx-2 overflow-x-auto px-2 pb-2 pt-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="flex min-w-max items-center gap-3">
+                    {tagOptions.map((option) => {
+                      const active = option.tag === selectedTag;
+
+                      return (
+                        <button
+                          key={option.tag}
+                          type="button"
+                          onClick={() => setSelectedTag(option.tag)}
+                          className={cn(
+                            'inline-flex items-center gap-3 rounded-full border px-4 py-2 text-sm transition',
+                            active
+                              ? 'border-cyan-300/26 bg-cyan-300/12 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]'
+                              : 'border-white/10 bg-white/6 text-white/58 hover:border-white/18 hover:bg-white/8 hover:text-white/78',
+                          )}
+                        >
+                          <span className="font-semibold">{option.tag}</span>
+                          <span className={cn('text-xs', active ? 'text-cyan-100/72' : 'text-white/40')}>
+                            {option.count} 条
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              <motion.div layout className="flex flex-wrap gap-8">
+                <AnimatePresence mode="popLayout">
+                  {gridQuestions.map((question) => (
+                    <QuestionCard
+                      key={question.id}
+                      q={question}
+                      viewMode="grid"
+                      nowTimestamp={nowTimestamp}
+                      onClick={() => setFocusedQuestionId(question.id)}
+                      focused={focusedQuestionId === question.id}
+                    />
+                  ))}
+                </AnimatePresence>
+              </motion.div>
+            </div>
           </motion.div>
         ) : (
           <div
@@ -757,6 +1092,18 @@ export function BoardView({
           </div>
         )}
       </main>
+
+      <AnimatePresence>
+        {focusedQuestion && viewMode === 'grid' ? (
+          <FocusedQuestionOverlay
+            question={focusedQuestion}
+            nowTimestamp={nowTimestamp}
+            onClose={() => setFocusedQuestionId(null)}
+            onMarkAnswered={() => void markQuestionAnswered(focusedQuestion.id)}
+            markingAnswered={answeredQuestionIds.includes(focusedQuestion.id)}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {highlightedQuestion ? (

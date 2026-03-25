@@ -9,7 +9,6 @@ import {
   listQuestions,
   updateQuestionById,
 } from '../store/questions.js';
-import { getAppSettings } from '../store/settings.js';
 import type {
   AnswerStatus,
   CreateQuestionInput,
@@ -176,7 +175,6 @@ export function createQuestionsRouter(): Router {
         return;
       }
 
-      const settings = await getAppSettings();
       const now = new Date().toISOString();
       const question = await createQuestion({
         id: randomUUID(),
@@ -184,7 +182,7 @@ export function createQuestionsRouter(): Router {
         tag: input.tag ?? '',
         route: input.route,
         submitterKey: input.submitterKey,
-        displayStatus: settings.autoPublishEnabled ? 'show_raw' : 'pending',
+        displayStatus: 'show_raw',
         answerStatus: 'unanswered',
         createdAt: now,
         updatedAt: now,

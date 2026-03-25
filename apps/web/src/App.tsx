@@ -16,6 +16,7 @@ import {
   Search,
   ShieldAlert,
   Sparkles,
+  Tag,
   Wifi,
   WifiOff,
 } from 'lucide-react';
@@ -30,9 +31,9 @@ type DisplayStatus =
   | 'redirect_official'
   | 'archived';
 type AnswerStatus = 'unanswered' | 'answered_live' | 'answered_post';
+type ArchiveState = 'all' | 'active' | 'archived';
 type ConnectionState = 'connecting' | 'live' | 'error';
 type LoadingState = 'loading' | 'ready' | 'error';
-type TimeRange = 'all' | 'today' | 'three_days' | 'seven_days';
 
 type Question = {
   id: string;
@@ -51,16 +52,12 @@ type QuestionEvent =
   | { type: 'question.updated'; payload: Question }
   | { type: 'question.deleted'; payload: { id: string } };
 
-type AppSettings = {
-  autoPublishEnabled: boolean;
-};
-
 type FilterState = {
   keyword: string;
   route: 'all' | QuestionRoute;
-  displayStatus: 'all' | DisplayStatus;
+  archiveState: ArchiveState;
   answerStatus: 'all' | AnswerStatus;
-  timeRange: TimeRange;
+  tag: string;
 };
 
 type SummaryCardProps = {
@@ -76,26 +73,10 @@ const ROUTE_LABEL: Record<QuestionRoute, string> = {
   meeting_only: '会上公开',
 };
 
-const DISPLAY_STATUS_LABEL: Record<DisplayStatus, string> = {
-  pending: '待处理',
-  show_raw: '原文可展示',
-  count_only: '仅计数不展示',
-  redirect_official: '转正式渠道',
-  archived: '已归档',
-};
-
 const ANSWER_STATUS_LABEL: Record<AnswerStatus, string> = {
   unanswered: '待回答',
   answered_live: '已现场回答',
   answered_post: '会后补答',
-};
-
-const DISPLAY_STATUS_ORDER: Record<DisplayStatus, number> = {
-  pending: 0,
-  show_raw: 1,
-  count_only: 2,
-  redirect_official: 3,
-  archived: 4,
 };
 
 const ROUTE_BADGE_STYLES: Record<QuestionRoute, string> = {
@@ -103,13 +84,7 @@ const ROUTE_BADGE_STYLES: Record<QuestionRoute, string> = {
   meeting_only: 'border-sky-400/30 bg-sky-400/10 text-sky-100',
 };
 
-const DISPLAY_STATUS_BADGE_STYLES: Record<DisplayStatus, string> = {
-  pending: 'border-amber-300/30 bg-amber-300/10 text-amber-100',
-  show_raw: 'border-teal-300/30 bg-teal-300/10 text-teal-100',
-  count_only: 'border-indigo-300/30 bg-indigo-300/10 text-indigo-100',
-  redirect_official: 'border-rose-300/30 bg-rose-300/10 text-rose-100',
-  archived: 'border-slate-300/20 bg-slate-200/10 text-slate-200',
-};
+const ARCHIVED_BADGE_TONE = 'border-slate-300/20 bg-slate-200/10 text-slate-200';
 
 const ANSWER_STATUS_BADGE_STYLES: Record<AnswerStatus, string> = {
   unanswered: 'border-white/10 bg-white/6 text-white/80',
@@ -123,12 +98,9 @@ const ROUTE_OPTIONS = [
   { value: 'meeting_only', label: '会上公开' },
 ] as const;
 
-const DISPLAY_STATUS_OPTIONS = [
-  { value: 'all', label: '全部展示状态' },
-  { value: 'pending', label: '待处理' },
-  { value: 'show_raw', label: '原文可展示' },
-  { value: 'count_only', label: '仅计数不展示' },
-  { value: 'redirect_official', label: '转正式渠道' },
+const ARCHIVE_STATE_OPTIONS = [
+  { value: 'all', label: '全部归档状态' },
+  { value: 'active', label: '未归档' },
   { value: 'archived', label: '已归档' },
 ] as const;
 
@@ -139,20 +111,19 @@ const ANSWER_STATUS_OPTIONS = [
   { value: 'answered_post', label: '会后补答' },
 ] as const;
 
-const TIME_RANGE_OPTIONS = [
-  { value: 'all', label: '全部时间' },
-  { value: 'today', label: '今天' },
-  { value: 'three_days', label: '近 3 天' },
-  { value: 'seven_days', label: '近 7 天' },
-] as const;
+const UNCLASSIFIED_TAG_VALUE = '__untagged__';
 
 const DEFAULT_FILTERS: FilterState = {
   keyword: '',
   route: 'all',
-  displayStatus: 'all',
+  archiveState: 'all',
   answerStatus: 'all',
-  timeRange: 'all',
+  tag: 'all',
 };
+
+function isArchivedStatus(status: DisplayStatus): boolean {
+  return status === 'archived';
+}
 
 function parseQuestionEvent(raw: string): QuestionEvent | null {
   try {
@@ -184,25 +155,6 @@ function formatDateTime(value: string): string {
     minute: '2-digit',
     hour12: false,
   }).format(new Date(value));
-}
-
-function matchesTimeRange(value: string, timeRange: TimeRange): boolean {
-  if (timeRange === 'all') {
-    return true;
-  }
-
-  const createdAt = new Date(value).getTime();
-  const now = Date.now();
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-
-  if (timeRange === 'today') {
-    return createdAt >= startOfToday.getTime();
-  }
-
-  const days = timeRange === 'three_days' ? 3 : 7;
-
-  return createdAt >= now - days * 24 * 60 * 60 * 1000;
 }
 
 function SummaryCard({ label, value, hint, active = false, onClick }: SummaryCardProps) {
@@ -266,9 +218,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
   const [savingKey, setSavingKey] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const [appSettings, setAppSettings] = useState<AppSettings>({ autoPublishEnabled: false });
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [settingsError, setSettingsError] = useState('');
+  const [tagDraft, setTagDraft] = useState('');
   const deferredKeyword = useDeferredValue(filters.keyword.trim().toLowerCase());
 
   async function loadQuestions(mode: 'initial' | 'refresh' = 'initial') {
@@ -305,25 +255,8 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
     }
   }
 
-  async function loadSettings() {
-    try {
-      const response = await fetch('/api/settings');
-      const data = (await response.json()) as Partial<AppSettings> & { message?: string };
-
-      if (!response.ok || typeof data.autoPublishEnabled !== 'boolean') {
-        throw new Error(data.message || '自动直出设置加载失败。');
-      }
-
-      setAppSettings({ autoPublishEnabled: data.autoPublishEnabled });
-      setSettingsError('');
-    } catch (error) {
-      setSettingsError(error instanceof Error ? error.message : '自动直出设置加载失败。');
-    }
-  }
-
   useEffect(() => {
     void loadQuestions();
-    void loadSettings();
   }, []);
 
   useEffect(() => {
@@ -344,7 +277,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
         return;
       }
 
-      setActionMessage('刚刚收到一条新问题，已加入待处理列表。');
+      setActionMessage('刚刚收到一条新问题，已加入问题列表。');
       setActionError('');
       startTransition(() => {
         setQuestions((previous) => upsertQuestion(previous, parsed.payload));
@@ -393,10 +326,11 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
           return false;
         }
 
-        if (
-          filters.displayStatus !== 'all'
-          && question.displayStatus !== filters.displayStatus
-        ) {
+        if (filters.archiveState === 'active' && isArchivedStatus(question.displayStatus)) {
+          return false;
+        }
+
+        if (filters.archiveState === 'archived' && !isArchivedStatus(question.displayStatus)) {
           return false;
         }
 
@@ -407,7 +341,17 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
           return false;
         }
 
-        if (!matchesTimeRange(question.createdAt, filters.timeRange)) {
+        const normalizedTag = question.tag.trim();
+
+        if (filters.tag === UNCLASSIFIED_TAG_VALUE && normalizedTag.length > 0) {
+          return false;
+        }
+
+        if (
+          filters.tag !== 'all'
+          && filters.tag !== UNCLASSIFIED_TAG_VALUE
+          && normalizedTag !== filters.tag
+        ) {
           return false;
         }
 
@@ -417,12 +361,13 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
 
         return (
           question.text.toLowerCase().includes(deferredKeyword)
+          || question.tag.toLowerCase().includes(deferredKeyword)
           || ROUTE_LABEL[question.route].includes(deferredKeyword)
         );
       })
       .sort((left, right) => {
         const statusDelta =
-          DISPLAY_STATUS_ORDER[left.displayStatus] - DISPLAY_STATUS_ORDER[right.displayStatus];
+          Number(isArchivedStatus(left.displayStatus)) - Number(isArchivedStatus(right.displayStatus));
 
         if (statusDelta !== 0) {
           return statusDelta;
@@ -437,6 +382,24 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
         return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
       });
   }, [deferredKeyword, filters, questions]);
+
+  const tagOptions = useMemo(() => {
+    const options = [{ value: 'all', label: '全部标签' }];
+
+    if (questions.some((question) => question.tag.trim().length === 0)) {
+      options.push({ value: UNCLASSIFIED_TAG_VALUE, label: '未分类' });
+    }
+
+    const tags = Array.from(
+      new Set(
+        questions
+          .map((question) => question.tag.trim())
+          .filter((tag) => tag.length > 0),
+      ),
+    ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+
+    return options.concat(tags.map((tag) => ({ value: tag, label: tag })));
+  }, [questions]);
 
   useEffect(() => {
     if (filteredQuestions.length === 0) {
@@ -458,26 +421,29 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
     setActionError('');
   }, [selectedQuestion?.id]);
 
+  useEffect(() => {
+    setTagDraft(selectedQuestion?.tag ?? '');
+  }, [selectedQuestion?.id, selectedQuestion?.tag]);
+
   const summary = useMemo(() => {
     const total = questions.length;
-    const pending = questions.filter((item) => item.displayStatus === 'pending').length;
-    const showRaw = questions.filter((item) => item.displayStatus === 'show_raw').length;
-    const redirected = questions.filter((item) => item.displayStatus === 'redirect_official').length;
+    const archived = questions.filter((item) => isArchivedStatus(item.displayStatus)).length;
+    const active = total - archived;
     const postAnswered = questions.filter((item) => item.answerStatus === 'answered_post').length;
 
     return {
       total,
-      pending,
-      showRaw,
-      redirected,
+      active,
+      archived,
       postAnswered,
     };
   }, [questions]);
 
   async function updateQuestion(
     questionId: string,
-    payload: Partial<Pick<Question, 'displayStatus' | 'answerStatus'>>,
+    payload: Partial<Pick<Question, 'displayStatus' | 'answerStatus' | 'tag'>>,
     action: string,
+    successMessage = '问题状态已更新。',
   ) {
     setSavingKey(`${action}:${questionId}`);
     setActionMessage('');
@@ -501,7 +467,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
         setQuestions((previous) => upsertQuestion(previous, data));
       });
 
-      setActionMessage('问题状态已更新。');
+      setActionMessage(successMessage);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : '更新失败，请稍后重试。');
     } finally {
@@ -524,41 +490,6 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
     });
   }
 
-  async function toggleAutoPublish() {
-    const nextValue = !appSettings.autoPublishEnabled;
-    setIsSavingSettings(true);
-    setSettingsError('');
-
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          autoPublishEnabled: nextValue,
-        }),
-      });
-      const data = (await response.json()) as Partial<AppSettings> & { message?: string };
-
-      if (!response.ok || typeof data.autoPublishEnabled !== 'boolean') {
-        throw new Error(data.message || '自动直出设置保存失败。');
-      }
-
-      setAppSettings({ autoPublishEnabled: data.autoPublishEnabled });
-      setActionError('');
-      setActionMessage(
-        data.autoPublishEnabled
-          ? '自动直出已开启，新提交的问题会直接进入公开池和大屏。'
-          : '自动直出已关闭，新提交的问题会回到待处理。',
-      );
-    } catch (error) {
-      setSettingsError(error instanceof Error ? error.message : '自动直出设置保存失败。');
-    } finally {
-      setIsSavingSettings(false);
-    }
-  }
-
   return (
     <div className="app-shell min-h-screen text-white">
       <div className="mx-auto max-w-[1680px] px-4 pb-10 pt-4 md:px-6 xl:px-8">
@@ -576,7 +507,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                   问题管理
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-7 text-white/58">
-                  原始问题只读保留，会务端只做归类、展示判断和答复推进。
+                  原始问题只读保留，会务端只做归类和答复推进。
                 </p>
               </div>
             </div>
@@ -626,104 +557,32 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
           </div>
         </header>
 
-        <div className="mt-5 rounded-[1.8rem] border border-amber-300/16 bg-amber-300/8 px-5 py-4 text-sm leading-7 text-amber-50/90 shadow-[0_16px_40px_rgba(120,53,15,0.14)]">
-          <div className="flex items-start gap-3">
-            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
-            <p>
-              原始问题不可编辑、不可改写。如果原文包含隐私、点名或强识别信息，请改展示状态，不要改原文。
-            </p>
-          </div>
-        </div>
-
-        <section className="panel mt-5 rounded-[1.8rem] border border-white/8 px-5 py-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/42">
-                自动直出
-              </p>
-              <h2 className="mt-2 text-xl font-semibold text-white">
-                开启后，新提交的问题跳过人工处理
-              </h2>
-              <p className="mt-2 text-sm leading-7 text-white/58">
-                新问题会直接标记为“原文可展示”，立即进入公开池和大屏。仅影响开启后的新提交，历史问题不会自动回填。
-              </p>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-white">
-                  {appSettings.autoPublishEnabled ? '已开启' : '已关闭'}
-                </p>
-                <p className="mt-1 text-xs text-white/48">
-                  {appSettings.autoPublishEnabled ? '直接公开展示' : '仍需人工处理'}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                role="switch"
-                aria-checked={appSettings.autoPublishEnabled}
-                disabled={isSavingSettings}
-                onClick={() => void toggleAutoPublish()}
-                className={cn(
-                  'relative inline-flex h-11 w-20 items-center rounded-full border px-1 transition',
-                  appSettings.autoPublishEnabled
-                    ? 'border-emerald-300/35 bg-emerald-300/18'
-                    : 'border-white/10 bg-white/8',
-                  isSavingSettings && 'cursor-not-allowed opacity-70',
-                )}
-              >
-                <span
-                  className={cn(
-                    'inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-950 transition-transform',
-                    appSettings.autoPublishEnabled ? 'translate-x-9' : 'translate-x-0',
-                  )}
-                >
-                  {isSavingSettings ? '...' : appSettings.autoPublishEnabled ? 'ON' : 'OFF'}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {settingsError ? (
-            <div className="mt-4 rounded-[1.2rem] border border-rose-300/16 bg-rose-300/8 px-4 py-3 text-sm text-rose-50/88">
-              {settingsError}
-            </div>
-          ) : null}
-        </section>
-
-        <section className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
+        <section className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
           <SummaryCard
             label="总问题数"
             value={summary.total}
             hint="包含公开讨论和会上公开"
             active={
               filters.route === 'all'
-              && filters.displayStatus === 'all'
+              && filters.archiveState === 'all'
               && filters.answerStatus === 'all'
+              && filters.tag === 'all'
             }
             onClick={resetFilters}
           />
           <SummaryCard
-            label="待处理"
-            value={summary.pending}
-            hint="优先归类和判断是否可展示"
-            active={filters.displayStatus === 'pending'}
-            onClick={() => setQuickFilter({ displayStatus: 'pending' })}
+            label="展示中"
+            value={summary.active}
+            hint="未归档的问题会继续出现在页面中"
+            active={filters.archiveState === 'active'}
+            onClick={() => setQuickFilter({ archiveState: 'active' })}
           />
           <SummaryCard
-            label="原文可展示"
-            value={summary.showRaw}
-            hint="可进入公开池或大会展示"
-            active={filters.displayStatus === 'show_raw'}
-            onClick={() => setQuickFilter({ displayStatus: 'show_raw' })}
-          />
-          <SummaryCard
-            label="转正式渠道"
-            value={summary.redirected}
-            hint="不进入当前大会流程"
-            active={filters.displayStatus === 'redirect_official'}
-            onClick={() => setQuickFilter({ displayStatus: 'redirect_official' })}
+            label="已归档"
+            value={summary.archived}
+            hint="已从展示流中移出的内容"
+            active={filters.archiveState === 'archived'}
+            onClick={() => setQuickFilter({ archiveState: 'archived' })}
           />
           <SummaryCard
             label="会后补答"
@@ -739,11 +598,11 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
             <SectionTitle
               icon={<Filter className="h-5 w-5" />}
               title="筛选与检索"
-              subtitle="按处理方式、展示状态、答复状态和时间范围快速收敛待处理问题。"
+              subtitle="按处理方式、归档状态、答复状态和标签快速筛选问题。"
             />
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <label className="control-shell xl:col-span-2">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+              <label className="control-shell">
                 <Search className="h-4 w-4 text-white/35" />
                 <input
                   value={filters.keyword}
@@ -776,16 +635,16 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
 
               <label className="control-shell">
                 <select
-                  value={filters.displayStatus}
+                  value={filters.archiveState}
                   onChange={(event) =>
                     setFilters((current) => ({
                       ...current,
-                      displayStatus: event.target.value as FilterState['displayStatus'],
+                      archiveState: event.target.value as ArchiveState,
                     }))
                   }
                   className="control-input"
                 >
-                  {DISPLAY_STATUS_OPTIONS.map((option) => (
+                  {ARCHIVE_STATE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -814,16 +673,16 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
 
               <label className="control-shell">
                 <select
-                  value={filters.timeRange}
+                  value={filters.tag}
                   onChange={(event) =>
                     setFilters((current) => ({
                       ...current,
-                      timeRange: event.target.value as TimeRange,
+                      tag: event.target.value,
                     }))
                   }
                   className="control-input"
                 >
-                  {TIME_RANGE_OPTIONS.map((option) => (
+                  {tagOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -859,7 +718,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                 <SectionTitle
                   icon={<MessageSquareText className="h-5 w-5" />}
                   title="问题列表"
-                  subtitle={`当前命中 ${filteredQuestions.length} 条，默认优先展示待处理问题。`}
+                  subtitle={`当前命中 ${filteredQuestions.length} 条，默认优先展示未归档问题。`}
                 />
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-2 text-sm text-white/65">
                   <Clock3 className="h-4 w-4" />
@@ -899,11 +758,10 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
               ) : (
                 <div className="overflow-x-auto">
                   <div className="min-w-[960px] px-4 pb-4 md:px-6">
-                    <div className="mt-4 grid grid-cols-[110px_120px_minmax(0,2.2fr)_160px_150px_140px] gap-3 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/38">
+                    <div className="mt-4 grid grid-cols-[110px_120px_minmax(0,2.2fr)_150px_140px] gap-3 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/38">
                       <span>ID</span>
                       <span>处理方式</span>
                       <span>原始问题</span>
-                      <span>展示状态</span>
                       <span>答复状态</span>
                       <span>提交时间</span>
                     </div>
@@ -918,7 +776,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                             type="button"
                             onClick={() => setSelectedQuestionId(question.id)}
                             className={cn(
-                              'grid w-full grid-cols-[110px_120px_minmax(0,2.2fr)_160px_150px_140px] gap-3 rounded-[1.5rem] border px-3 py-3 text-left transition',
+                              'grid w-full grid-cols-[110px_120px_minmax(0,2.2fr)_150px_140px] gap-3 rounded-[1.5rem] border px-3 py-3 text-left transition',
                               isSelected
                                 ? 'border-cyan-300/28 bg-cyan-300/10 shadow-[0_16px_45px_rgba(6,182,212,0.14)]'
                                 : 'border-white/8 bg-white/4 hover:border-white/15 hover:bg-white/6',
@@ -938,18 +796,29 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                             </div>
 
                             <div className="space-y-2">
-                              <p className="line-clamp-2 text-sm leading-7 text-white/88">
+                              <p className="truncate text-sm leading-7 text-white/88">
                                 {question.text}
                               </p>
-                              <p className="text-xs text-white/42">
-                                更新时间 {formatDateTime(question.updatedAt)}
-                              </p>
-                            </div>
-
-                            <div className="pt-0.5">
-                              <StatusBadge tone={DISPLAY_STATUS_BADGE_STYLES[question.displayStatus]}>
-                                {DISPLAY_STATUS_LABEL[question.displayStatus]}
-                              </StatusBadge>
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span
+                                  className={cn(
+                                    'inline-flex items-center rounded-full border px-2.5 py-1',
+                                    question.tag.trim()
+                                      ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100/88'
+                                      : 'border-white/10 bg-white/6 text-white/45',
+                                  )}
+                                >
+                                  {question.tag.trim() || '未分类'}
+                                </span>
+                                {isArchivedStatus(question.displayStatus) ? (
+                                  <StatusBadge tone={ARCHIVED_BADGE_TONE}>
+                                    已归档
+                                  </StatusBadge>
+                                ) : null}
+                                <span className="text-white/42">
+                                  更新时间 {formatDateTime(question.updatedAt)}
+                                </span>
+                              </div>
                             </div>
 
                             <div className="pt-0.5">
@@ -981,110 +850,129 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                     transition={{ duration: 0.24, ease: 'easeOut' }}
                     className="panel rounded-[2rem] border border-white/8 p-5 md:p-6"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/42">
-                          详情面板
-                        </p>
-                        <h2 className="mt-2 text-2xl font-bold text-white">
-                          {questionTitle(selectedQuestion)}
-                        </h2>
-                      </div>
+                    <div className="flex flex-wrap items-start justify-end gap-3">
                       <div className="flex flex-wrap gap-2">
                         <StatusBadge tone={ROUTE_BADGE_STYLES[selectedQuestion.route]}>
                           {ROUTE_LABEL[selectedQuestion.route]}
                         </StatusBadge>
-                        <StatusBadge tone={DISPLAY_STATUS_BADGE_STYLES[selectedQuestion.displayStatus]}>
-                          {DISPLAY_STATUS_LABEL[selectedQuestion.displayStatus]}
-                        </StatusBadge>
+                        {isArchivedStatus(selectedQuestion.displayStatus) ? (
+                          <StatusBadge tone={ARCHIVED_BADGE_TONE}>
+                            已归档
+                          </StatusBadge>
+                        ) : null}
                       </div>
                     </div>
 
                     <div className="mt-5 rounded-[1.5rem] border border-white/8 bg-black/18 px-4 py-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/38">
-                        原始问题
-                      </p>
-                      <p className="mt-3 whitespace-pre-wrap text-sm leading-8 text-white/88">
+                      <p className="whitespace-pre-wrap text-sm leading-8 text-white/88">
                         {selectedQuestion.text}
                       </p>
                     </div>
 
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
                       <div className="meta-block">
-                        <span className="meta-label">问题 ID</span>
-                        <span className="meta-value font-mono">{selectedQuestion.id}</span>
-                      </div>
-                      <div className="meta-block">
                         <span className="meta-label">同类提交数</span>
                         <span className="meta-value">{selectedQuestion.count ?? 1}</span>
                       </div>
                       <div className="meta-block">
-                        <span className="meta-label">提交时间</span>
-                        <span className="meta-value">{formatDateTime(selectedQuestion.createdAt)}</span>
-                      </div>
-                      <div className="meta-block">
-                        <span className="meta-label">最近更新</span>
-                        <span className="meta-value">{formatDateTime(selectedQuestion.updatedAt)}</span>
+                        <span className="meta-label">当前标签</span>
+                        <span className="meta-value">{selectedQuestion.tag.trim() || '未分类'}</span>
                       </div>
                     </div>
 
                     <div className="mt-6 space-y-6">
                       <section>
                         <div className="flex items-center gap-2">
-                          <ShieldAlert className="h-4 w-4 text-cyan-100" />
+                          <Tag className="h-4 w-4 text-cyan-100" />
                           <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
-                            展示状态
+                            标签
                           </h3>
                         </div>
-                        <div className="mt-4 grid gap-2">
-                          {(
-                            [
-                              ['pending', '待处理', '尚未判断是否展示'],
-                              ['show_raw', '标记原文可展示', '可进入公开池或大会现场展示'],
-                              ['count_only', '仅计数不展示', '原文不公开，但保留为内部统计'],
-                              ['redirect_official', '转正式渠道', '不进入大会流程，转到正式处理路径'],
-                              ['archived', '归档', '当前轮次不再继续处理'],
-                            ] as Array<[DisplayStatus, string, string]>
-                          ).map(([value, label, description]) => {
-                            const active = selectedQuestion.displayStatus === value;
-                            const isSaving = savingKey === `displayStatus:${selectedQuestion.id}`;
 
-                            return (
+                        <div className="mt-4 rounded-[1.35rem] border border-white/8 bg-white/4 p-4">
+                          <p className="text-sm leading-6 text-white/55">
+                            用于公开问题筛选和大屏表格模式分类展示。
+                          </p>
+
+                          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                            <input
+                              value={tagDraft}
+                              onChange={(event) => setTagDraft(event.target.value)}
+                              placeholder="例如：晋升与发展"
+                              maxLength={120}
+                              className="min-w-0 flex-1 rounded-[1.15rem] border border-white/10 bg-white/6 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-cyan-300/24 focus:bg-white/8"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void updateQuestion(
+                                  selectedQuestion.id,
+                                  { tag: tagDraft.trim() },
+                                  'tag',
+                                  tagDraft.trim() ? '标签已更新。' : '标签已清空。',
+                                )
+                              }
+                              disabled={!!savingKey || tagDraft.trim() === selectedQuestion.tag.trim()}
+                              className={cn(
+                                'rounded-[1.15rem] border px-4 py-3 text-sm font-medium transition sm:min-w-[110px]',
+                                savingKey === `tag:${selectedQuestion.id}`
+                                  ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100'
+                                  : 'border-white/10 bg-white/8 text-white/82 hover:border-white/18 hover:bg-white/10',
+                                (savingKey || tagDraft.trim() === selectedQuestion.tag.trim())
+                                  && 'cursor-not-allowed opacity-60',
+                              )}
+                            >
+                              {savingKey === `tag:${selectedQuestion.id}` ? '保存中...' : '保存标签'}
+                            </button>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section>
+                        <div className="flex items-center gap-2">
+                          <ShieldAlert className="h-4 w-4 text-cyan-100" />
+                          <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
+                            归档
+                          </h3>
+                        </div>
+                        <div className="mt-4 rounded-[1.35rem] border border-white/8 bg-white/4 p-4">
+                          {isArchivedStatus(selectedQuestion.displayStatus) ? (
+                            <div className="space-y-3">
+                              <StatusBadge tone={ARCHIVED_BADGE_TONE}>
+                                已归档
+                              </StatusBadge>
+                              <p className="text-sm leading-6 text-white/55">
+                                这条问题已从当前展示流中移出，不会继续在大屏中出现。
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <p className="text-sm leading-6 text-white/55">
+                                当前所有问题默认直接展示，只有归档后才会从大屏和当前流程中移出。
+                              </p>
                               <button
-                                key={value}
                                 type="button"
                                 onClick={() =>
                                   void updateQuestion(
                                     selectedQuestion.id,
-                                    { displayStatus: value },
-                                    'displayStatus',
+                                    { displayStatus: 'archived' },
+                                    'archive',
+                                    '问题已归档。',
                                   )
                                 }
-                                disabled={active || !!savingKey}
+                                disabled={!!savingKey}
                                 className={cn(
-                                  'rounded-[1.35rem] border px-4 py-3 text-left transition',
-                                  active
-                                    ? 'border-cyan-300/28 bg-cyan-300/12'
-                                    : 'border-white/8 bg-white/4 hover:border-white/16 hover:bg-white/6',
-                                  isSaving && 'animate-pulse',
+                                  'rounded-[1.15rem] border px-4 py-3 text-sm font-medium transition',
+                                  savingKey === `archive:${selectedQuestion.id}`
+                                    ? 'border-slate-300/20 bg-slate-200/10 text-slate-100'
+                                    : 'border-white/10 bg-white/8 text-white/82 hover:border-white/18 hover:bg-white/10',
+                                  !!savingKey && 'cursor-not-allowed opacity-60',
                                 )}
                               >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <p className="text-sm font-medium text-white">{label}</p>
-                                    <p className="mt-1 text-sm leading-6 text-white/52">
-                                      {description}
-                                    </p>
-                                  </div>
-                                  {active ? (
-                                    <StatusBadge tone={DISPLAY_STATUS_BADGE_STYLES[value]}>
-                                      当前状态
-                                    </StatusBadge>
-                                  ) : null}
-                                </div>
+                                {savingKey === `archive:${selectedQuestion.id}` ? '归档中...' : '归档这条问题'}
                               </button>
-                            );
-                          })}
+                            </div>
+                          )}
                         </div>
                       </section>
 
@@ -1152,7 +1040,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                       </div>
                       <h2 className="mt-5 text-2xl font-semibold text-white">选择一条问题查看详情</h2>
                       <p className="mt-3 max-w-sm text-sm leading-7 text-white/55">
-                        右侧会显示原始问题全文、当前状态和可执行的管理动作。
+                        右侧会显示原始问题全文、标签、归档动作和答复推进。
                       </p>
                     </div>
                   </motion.div>
@@ -1164,16 +1052,6 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
       </div>
     </div>
   );
-}
-
-function questionTitle(question: Question): string {
-  const normalized = question.text.trim().replace(/\s+/g, ' ');
-
-  if (normalized.length <= 26) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, 26)}...`;
 }
 
 const BOARD_PATH = normalizeAppPath(import.meta.env.VITE_BOARD_PATH ?? '/board/');
