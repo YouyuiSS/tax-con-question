@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { broadcast } from '../store/sse.js';
+import { getAppSettings } from '../store/settings.js';
 import {
-  countQuestionsBySubmitterKey,
   createQuestion,
   deleteQuestionById,
   incrementQuestionCountById,
@@ -14,6 +14,7 @@ import type {
   CreateQuestionInput,
   DisplayStatus,
   QuestionEvent,
+  Question,
   QuestionRoute,
   UpdateQuestionInput,
 } from '../types.js';
@@ -31,18 +32,9 @@ const ALLOWED_ANSWER_STATUSES: AnswerStatus[] = [
   'answered_live',
   'answered_post',
 ];
-const MAX_QUESTIONS_PER_SUBMITTER = 3;
+const PUBLIC_TIME_BUCKET_MS = 30 * 60 * 1000;
 
-function extractSubmitterKey(req: Request): string {
-  const headerValue = req.header('x-submitter-key')?.trim() ?? '';
-
-  if (headerValue.length > 0) {
-    return headerValue.slice(0, 120);
-  }
-
-  const fallback = (req.ip ?? '').trim();
-  return fallback.slice(0, 120);
-}
+type PublicQuestionView = Pick<Question, 'id' | 'text' | 'tag' | 'route' | 'count' | 'createdAt'>;
 
 function isQuestionRoute(value: string): value is QuestionRoute {
   return ALLOWED_ROUTES.includes(value as QuestionRoute);
@@ -56,7 +48,35 @@ function isAnswerStatus(value: string): value is AnswerStatus {
   return ALLOWED_ANSWER_STATUSES.includes(value as AnswerStatus);
 }
 
-function parseCreateQuestionInput(body: unknown, submitterKey: string): CreateQuestionInput {
+function bucketTimestamp(value: string): string {
+  const timestamp = new Date(value).getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+
+  return new Date(
+    Math.floor(timestamp / PUBLIC_TIME_BUCKET_MS) * PUBLIC_TIME_BUCKET_MS,
+  ).toISOString();
+}
+
+function isPubliclyVisibleQuestion(question: Question, autoPublishEnabled: boolean): boolean {
+  return question.displayStatus === 'show_raw'
+    && (autoPublishEnabled || question.route === 'public_discuss');
+}
+
+function toPublicQuestionView(question: Question): PublicQuestionView {
+  return {
+    id: question.id,
+    text: question.text,
+    tag: question.tag,
+    route: question.route,
+    count: question.count ?? 1,
+    createdAt: bucketTimestamp(question.createdAt),
+  };
+}
+
+function parseCreateQuestionInput(body: unknown): CreateQuestionInput {
   if (!body || typeof body !== 'object') {
     throw new Error('Invalid request body.');
   }
@@ -82,7 +102,6 @@ function parseCreateQuestionInput(body: unknown, submitterKey: string): CreateQu
     text: rawText,
     tag: rawTag,
     route,
-    submitterKey,
   };
 }
 
@@ -138,6 +157,20 @@ function parseUpdateQuestionInput(body: unknown): UpdateQuestionInput {
 export function createQuestionsRouter(): Router {
   const router = Router();
 
+  router.get('/public', async (_req, res, next) => {
+    try {
+      const settings = await getAppSettings();
+      const items = await listQuestions(undefined, 'show_raw');
+      const visibleItems = items
+        .filter((question) => isPubliclyVisibleQuestion(question, settings.autoPublishEnabled))
+        .map(toPublicQuestionView);
+
+      res.json({ items: visibleItems });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get('/', async (req, res, next) => {
     try {
       const route = typeof req.query.route === 'string' ? req.query.route : '';
@@ -166,14 +199,7 @@ export function createQuestionsRouter(): Router {
 
   router.post('/', async (req, res, next) => {
     try {
-      const submitterKey = extractSubmitterKey(req);
-      const input = parseCreateQuestionInput(req.body, submitterKey);
-      const existingCount = await countQuestionsBySubmitterKey(input.submitterKey);
-
-      if (existingCount >= MAX_QUESTIONS_PER_SUBMITTER) {
-        res.status(429).json({ message: `每人最多可提交 ${MAX_QUESTIONS_PER_SUBMITTER} 个问题。` });
-        return;
-      }
+      const input = parseCreateQuestionInput(req.body);
 
       const now = new Date().toISOString();
       const question = await createQuestion({
@@ -181,7 +207,6 @@ export function createQuestionsRouter(): Router {
         text: input.text,
         tag: input.tag ?? '',
         route: input.route,
-        submitterKey: input.submitterKey,
         displayStatus: 'show_raw',
         answerStatus: 'unanswered',
         createdAt: now,
@@ -210,13 +235,20 @@ export function createQuestionsRouter(): Router {
         return;
       }
 
+      const settings = await getAppSettings();
+
+      if (!isPubliclyVisibleQuestion(updated, settings.autoPublishEnabled)) {
+        res.status(404).json({ message: 'Question not found.' });
+        return;
+      }
+
       const event: QuestionEvent = {
         type: 'question.updated',
         payload: updated,
       };
 
       broadcast(event);
-      res.json(updated);
+      res.json(toPublicQuestionView(updated));
     } catch (error) {
       next(error);
     }

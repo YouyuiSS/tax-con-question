@@ -51,7 +51,6 @@ export async function initializeDatabase(): Promise<void> {
         check (display_status in ('pending', 'show_raw', 'count_only', 'redirect_official', 'archived')),
       answer_status varchar(32) not null default 'unanswered'
         check (answer_status in ('unanswered', 'answered_live', 'answered_post')),
-      submitter_key varchar(120) not null default '',
       count integer not null default 1,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
@@ -69,10 +68,6 @@ export async function initializeDatabase(): Promise<void> {
   `);
   await pool.query(`
     alter table ${table}
-    add column if not exists submitter_key varchar(120) not null default ''
-  `);
-  await pool.query(`
-    alter table ${table}
     add column if not exists updated_at timestamptz not null default now()
   `);
   await pool.query(`
@@ -86,12 +81,6 @@ export async function initializeDatabase(): Promise<void> {
       `${config.database.tablePrefix}questions_display_status_idx`,
     )}
     on ${table} (display_status)
-  `);
-  await pool.query(`
-    create index if not exists ${escapeIdentifier(
-      `${config.database.tablePrefix}questions_submitter_key_idx`,
-    )}
-    on ${table} (submitter_key)
   `);
   await pool.query(`
     create table if not exists ${settingsTable} (

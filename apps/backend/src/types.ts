@@ -19,7 +19,6 @@ export type Question = {
   route: QuestionRoute;
   displayStatus: DisplayStatus;
   answerStatus: AnswerStatus;
-  submitterKey?: string;
   createdAt: string;
   updatedAt: string;
   count?: number;
@@ -39,7 +38,6 @@ export type CreateQuestionInput = {
   text: string;
   tag?: string;
   route: QuestionRoute;
-  submitterKey: string;
 };
 
 export type UpdateQuestionInput = {

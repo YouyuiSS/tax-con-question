@@ -6,7 +6,6 @@
 
 - 不采集姓名、工号、邮箱、OpenID、UnionID。
 - 不提供修改原始问题内容的能力。
-- `直达领导` 通道仅存密文，不存明文。
 - 热度来自 `同类独立提交数`，不做点赞和支持。
 - 日志、监控、网关不得记录提问明文请求体。
 
@@ -16,7 +15,6 @@
 | --- | --- | --- |
 | `public_discuss` | 公开讨论 | 审核后进入公开问题池，可在会前被看到 |
 | `meeting_only` | 会上公开 | 会前不公开，进入大会筹备和现场展示 |
-| `direct_leader` | 直达领导 | 不上会、不公开，仅指定收件人可查看 |
 
 ## 3. Display Status Definitions
 
@@ -45,17 +43,9 @@
 | `active` | 使用中 | 当前参与大会排序和展示 |
 | `archived` | 已归档 | 不再展示或已完成沉淀 |
 
-## 6. Direct Message Status Definitions
+## 6. Tables
 
-| Status Code | Display Name | Description |
-| --- | --- | --- |
-| `new` | 新消息 | 尚未阅读 |
-| `read` | 已读 | 已由指定收件人查看 |
-| `archived` | 已归档 | 已归档，不在默认列表显示 |
-
-## 7. Tables
-
-### 7.1 `raw_questions`
+### 6.1 `raw_questions`
 
 存放 `公开讨论` 和 `会上公开` 两类原始问题。
 
@@ -76,7 +66,7 @@ Constraints:
 - 不允许提供更新 `raw_content` 的接口。
 - `topic_id` 可为空，表示未归类。
 
-### 7.2 `topics`
+### 6.2 `topics`
 
 存放大会议题。
 
@@ -94,29 +84,7 @@ Notes:
 - `question_count` 建议通过查询实时统计，不单独冗余。
 - 议题标题是归类字段，不覆盖原始问题内容。
 
-### 7.3 `direct_messages`
-
-存放 `直达领导` 密文数据。
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `id` | `uuid` | yes | 主键 |
-| `recipient_id` | `varchar(64)` | yes | 指定收件人标识 |
-| `ciphertext` | `text` | yes | 加密后的正文 |
-| `encrypted_key` | `text` | yes | 使用公钥加密的会话密钥 |
-| `nonce` | `varchar(128)` | yes | 加密随机参数 |
-| `public_key_version` | `varchar(32)` | yes | 公钥版本 |
-| `created_at_bucket` | `timestamptz` | yes | 分桶后的提交时间 |
-| `read_at` | `timestamptz` | no | 阅读时间 |
-| `status` | `text` | yes | 默认 `new` |
-
-Notes:
-
-- 只存密文，不存明文。
-- `created_at_bucket` 建议按 `30 分钟` 或 `1 小时` 分桶，减少时间关联。
-- 私钥不得进入服务器、数据库或代码仓库。
-
-### 7.4 `admin_audit_logs`
+### 6.3 `admin_audit_logs`
 
 记录会务操作。
 
@@ -135,11 +103,10 @@ Notes:
 
 - 审计 `归类、改状态、排序` 等动作。
 - 不存在“修改原文”的审计，因为不允许修改原文。
-- 不记录 `直达领导` 的明文内容。
 
-## 8. API List
+## 7. API List
 
-## 8.1 Public APIs
+## 7.1 Public APIs
 
 ### `GET /api/meta/config`
 
@@ -152,7 +119,6 @@ Notes:
 - 处理方式列表
 - 字数限制
 - 风险提示文案
-- 领导公钥版本
 
 ### `POST /api/questions`
 
@@ -202,59 +168,7 @@ Response:
 - `keyword`
 - `topicId`
 
-## 8.2 Direct-to-Leader APIs
-
-### `POST /api/direct-messages`
-
-用途：
-
-- 提交 `直达领导` 的密文消息。
-
-Request:
-
-```json
-{
-  "recipientId": "leader_1",
-  "ciphertext": "base64...",
-  "encryptedKey": "base64...",
-  "nonce": "base64...",
-  "publicKeyVersion": "v1"
-}
-```
-
-Response:
-
-```json
-{
-  "id": "uuid",
-  "status": "new"
-}
-```
-
-### `GET /api/leader/messages`
-
-用途：
-
-- 领导拉取密文消息列表。
-
-Response Rules:
-
-- 只返回密文字段和状态字段
-- 不返回明文内容
-
-### `PATCH /api/leader/messages/:id/read`
-
-用途：
-
-- 标记消息为已读。
-
-### `PATCH /api/leader/messages/:id/archive`
-
-用途：
-
-- 标记消息为已归档。
-
-## 8.3 Organizer APIs
+## 7.2 Organizer APIs
 
 ### `GET /api/admin/questions`
 
@@ -384,16 +298,14 @@ Request:
 
 - 导出会后 FAQ 数据。
 
-## 9. APIs Explicitly Not Provided
+## 8. APIs Explicitly Not Provided
 
 - 不提供修改原始问题内容的接口。
 - 不提供点赞、支持、评论接口。
 - 不提供普通员工查看 `会上公开` 原文的接口。
-- 不提供返回 `直达领导` 明文的接口。
 
-## 10. Security Requirements
+## 9. Security Requirements
 
 - 公共提问接口不要求登录。
 - 会务接口走内部登录或白名单。
-- 领导接口即使做登录，返回的也仍应是密文。
 - 接口日志、反向代理日志、监控系统不得记录明文请求体。

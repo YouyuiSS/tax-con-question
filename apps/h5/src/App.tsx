@@ -39,10 +39,10 @@ const BASE_ROUTE_META: Record<QuestionRoute, RouteMeta> = {
     successNote: '会前不公开。',
   },
   public_discuss: {
-    title: '公开问题',
-    description: '提交后会立即公开展示。',
-    confirmBody: '你的问题提交后会立即公开展示。',
-    successBody: '你的问题已收到，已公开展示。',
+    title: '公开讨论',
+    description: '提交后进入公开池，其他同事可以看到。',
+    confirmBody: '你的问题提交后会进入公开池，其他同事可以看到。',
+    successBody: '你的问题已收到，已进入公开池。',
   },
 };
 
@@ -56,8 +56,12 @@ const MAX_LENGTH = 500;
 const REQUEST_TIMEOUT_MS = 10000;
 const ALL_TOPICS = '全部';
 const CARED_QUESTION_IDS_KEY = 'tcq_cared_question_ids';
-const SUBMITTER_KEY_STORAGE_KEY = 'tcq_submitter_key';
 const INPUT_HINT = '把你真正关心、想被回应的问题写下来。尽量聚焦问题本身，避免涉及敏感或违规内容。';
+const RISK_NOTES = [
+  '默认不收集姓名、工号等实名字段。',
+  '请避免填写具体人名、项目名、时间点等可识别信息。',
+  '当前版本适合非实名收集，不建议提交高风险敏感内容。',
+] as const;
 
 function getValidationMessage(text: string): string {
   const trimmedLength = text.trim().length;
@@ -119,26 +123,6 @@ function getRouteMeta(route: QuestionRoute, autoPublishEnabled: boolean): RouteM
     successBody: '你的问题已收到，已直接进入公开池和大屏。',
     successNote: '本次为自动直出。',
   };
-}
-
-function createSubmitterKey(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return `submitter-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function getSubmitterKey(): string {
-  const stored = window.localStorage.getItem(SUBMITTER_KEY_STORAGE_KEY)?.trim() ?? '';
-
-  if (stored) {
-    return stored;
-  }
-
-  const next = createSubmitterKey();
-  window.localStorage.setItem(SUBMITTER_KEY_STORAGE_KEY, next);
-  return next;
 }
 
 export default function App() {
@@ -304,10 +288,7 @@ export default function App() {
       setCareErrorMessage('');
 
       try {
-        const query = appSettings.autoPublishEnabled
-          ? '/api/questions?displayStatus=show_raw'
-          : '/api/questions?route=public_discuss';
-        const response = await fetch(query, {
+        const response = await fetch('/api/questions/public', {
           signal: controller.signal,
         });
 
@@ -350,7 +331,6 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Submitter-Key': getSubmitterKey(),
         },
         signal: controller.signal,
         body: JSON.stringify({
@@ -652,8 +632,14 @@ export default function App() {
           <>
             <header className="page-header">
               <h1>税务心声</h1>
-              <p className="subtitle">写下你希望在大会上被回应的问题。</p>
+              <p className="subtitle">写下你希望在大会上被回应的问题，请避免填写可识别个人信息。</p>
             </header>
+
+            <section className="risk-note-card" aria-label="提交提醒">
+              {RISK_NOTES.map((note) => (
+                <p key={note}>{note}</p>
+              ))}
+            </section>
 
             <section className="editor-section">
               <label className="section-title" htmlFor="question-input">

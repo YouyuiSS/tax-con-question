@@ -13,7 +13,6 @@ type QuestionRow = {
   route: Question['route'];
   display_status: Question['displayStatus'];
   answer_status: Question['answerStatus'];
-  submitter_key: string;
   count: number;
   created_at: string;
   updated_at: string;
@@ -55,7 +54,7 @@ export async function listQuestions(
     : '';
   const result = await query<QuestionRow>(
     `
-      select id, text, tag, route, display_status, answer_status, submitter_key, count, created_at, updated_at
+      select id, text, tag, route, display_status, answer_status, count, created_at, updated_at
       from {{questions}}
       ${whereClause}
       order by created_at desc
@@ -76,13 +75,12 @@ export async function createQuestion(question: Question): Promise<Question> {
         route,
         display_status,
         answer_status,
-        submitter_key,
         count,
         created_at,
         updated_at
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      returning id, text, tag, route, display_status, answer_status, submitter_key, count, created_at, updated_at
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      returning id, text, tag, route, display_status, answer_status, count, created_at, updated_at
     `,
     [
       question.id,
@@ -91,7 +89,6 @@ export async function createQuestion(question: Question): Promise<Question> {
       question.route,
       question.displayStatus,
       question.answerStatus,
-      question.submitterKey ?? '',
       question.count ?? 1,
       question.createdAt,
       question.updatedAt,
@@ -106,7 +103,7 @@ export async function deleteQuestionById(id: string): Promise<Question | null> {
     `
       delete from {{questions}}
       where id = $1
-      returning id, text, tag, route, display_status, answer_status, submitter_key, count, created_at, updated_at
+      returning id, text, tag, route, display_status, answer_status, count, created_at, updated_at
     `,
     [id],
   );
@@ -125,7 +122,7 @@ export async function incrementQuestionCountById(id: string): Promise<Question |
       set count = count + 1,
           updated_at = now()
       where id = $1
-      returning id, text, tag, route, display_status, answer_status, submitter_key, count, created_at, updated_at
+      returning id, text, tag, route, display_status, answer_status, count, created_at, updated_at
     `,
     [id],
   );
@@ -171,7 +168,7 @@ export async function updateQuestionById(
       set ${assignments.join(', ')},
           updated_at = now()
       where id = $${params.length}
-      returning id, text, tag, route, display_status, answer_status, submitter_key, count, created_at, updated_at
+      returning id, text, tag, route, display_status, answer_status, count, created_at, updated_at
     `,
     params,
   );
@@ -181,17 +178,4 @@ export async function updateQuestionById(
   }
 
   return mapQuestionRow(result.rows[0]);
-}
-
-export async function countQuestionsBySubmitterKey(submitterKey: string): Promise<number> {
-  const result = await query<{ total: string }>(
-    `
-      select count(*)::text as total
-      from {{questions}}
-      where submitter_key = $1
-    `,
-    [submitterKey],
-  );
-
-  return Number(result.rows[0]?.total ?? '0');
 }

@@ -786,7 +786,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                               <p className="font-mono text-sm font-semibold text-white/88">
                                 {shortQuestionId(question.id)}
                               </p>
-                              <p className="text-xs text-white/38">{question.count ?? 1} 条同类</p>
+                              <p className="text-xs text-white/38">关心人数 {question.count ?? 1}</p>
                             </div>
 
                             <div className="pt-0.5">
@@ -869,14 +869,10 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                       </p>
                     </div>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <div className="mt-5">
                       <div className="meta-block">
-                        <span className="meta-label">同类提交数</span>
+                        <span className="meta-label">关心人数</span>
                         <span className="meta-value">{selectedQuestion.count ?? 1}</span>
-                      </div>
-                      <div className="meta-block">
-                        <span className="meta-label">当前标签</span>
-                        <span className="meta-value">{selectedQuestion.tag.trim() || '未分类'}</span>
                       </div>
                     </div>
 

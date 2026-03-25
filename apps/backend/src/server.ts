@@ -13,7 +13,7 @@ async function startServer(): Promise<void> {
 
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, X-Submitter-Key');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
     res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
 
     if (req.method === 'OPTIONS') {
@@ -30,8 +30,6 @@ async function startServer(): Promise<void> {
     res.json({
       ok: true,
       service: 'backend',
-      schema: config.database.schema,
-      tablePrefix: config.database.tablePrefix,
     });
   });
 
@@ -40,9 +38,7 @@ async function startServer(): Promise<void> {
   app.use('/api/events', createEventsRouter());
 
   app.listen(config.port, () => {
-    console.log(
-      `backend listening on http://localhost:${config.port} using schema ${config.database.schema}`,
-    );
+    console.log(`backend listening on http://localhost:${config.port}`);
   });
 }
 

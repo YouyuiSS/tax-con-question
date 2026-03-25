@@ -246,7 +246,7 @@ function QuestionCard({
 
       <div className="relative z-10 mt-6 flex items-center justify-between gap-4 border-t border-white/10 pt-4 text-sm">
         <time className="text-white/45">{formatQuestionTime(q.createdAt, nowTimestamp)}</time>
-        <span className="text-white/72">{count}人关心</span>
+        <span className="text-white/72">关心人数 {count}</span>
       </div>
     </motion.article>
   );
@@ -335,7 +335,7 @@ function FocusedQuestionOverlay({
             </button>
           </div>
 
-          <span className="justify-self-end text-white/72">{count}人关心</span>
+          <span className="justify-self-end text-white/72">关心人数 {count}</span>
         </div>
       </motion.section>
     </motion.div>
