@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   startTransition,
   useDeferredValue,
   useEffect,
@@ -20,9 +22,9 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
+import { openAdminEventStream } from './lib/adminEventStream';
 import { adminFetch } from './lib/adminAuth';
 import { cn } from './lib/utils';
-import { BoardView } from './BoardView';
 
 type QuestionRoute = 'public_discuss' | 'meeting_only';
 type DisplayStatus =
@@ -63,6 +65,16 @@ type SummaryCardProps = {
   active?: boolean;
   onClick: () => void;
 };
+
+type RealtimeQuestionEvent =
+  | {
+    type: 'question.created' | 'question.updated';
+    payload: Question;
+  }
+  | {
+    type: 'question.deleted';
+    payload: { id: string };
+  };
 
 const ROUTE_LABEL: Record<QuestionRoute, string> = {
   public_discuss: '公开问题',
@@ -117,8 +129,75 @@ const DEFAULT_FILTERS: FilterState = {
   tag: 'all',
 };
 
+const LazyBoardView = lazy(async () => {
+  const module = await import('./BoardView');
+
+  return {
+    default: module.BoardView,
+  };
+});
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isRealtimeQuestion(value: unknown): value is Question {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (
+    typeof value.id !== 'string'
+    || typeof value.text !== 'string'
+    || typeof value.tag !== 'string'
+    || typeof value.route !== 'string'
+    || typeof value.displayStatus !== 'string'
+    || typeof value.answerStatus !== 'string'
+    || typeof value.createdAt !== 'string'
+    || typeof value.updatedAt !== 'string'
+  ) {
+    return false;
+  }
+
+  return value.count === undefined || typeof value.count === 'number';
+}
+
+function parseRealtimeQuestionEvent(value: unknown): RealtimeQuestionEvent | null {
+  if (!isRecord(value) || typeof value.type !== 'string' || !('payload' in value)) {
+    return null;
+  }
+
+  if (value.type === 'question.created' || value.type === 'question.updated') {
+    return isRealtimeQuestion(value.payload)
+      ? {
+        type: value.type,
+        payload: value.payload,
+      }
+      : null;
+  }
+
+  if (value.type === 'question.deleted') {
+    return isRecord(value.payload) && typeof value.payload.id === 'string'
+      ? {
+        type: value.type,
+        payload: { id: value.payload.id },
+      }
+      : null;
+  }
+
+  return null;
+}
+
 function isArchivedStatus(status: DisplayStatus): boolean {
   return status === 'archived';
+}
+
+function getQuestionTagValue(tag: string): string {
+  return tag.trim();
+}
+
+function compareIsoDateDesc(left: string, right: string): number {
+  return right.localeCompare(left);
 }
 
 function upsertQuestion(list: Question[], question: Question): Question[] {
@@ -196,11 +275,11 @@ function StatusBadge({
 }
 
 function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
-  const POLL_INTERVAL_MS = 10000;
   const [questions, setQuestions] = useState<Question[]>([]);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [loadingState, setLoadingState] = useState<LoadingState>('loading');
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
+  const [streamKey, setStreamKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
@@ -210,10 +289,10 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
   const [tagDraft, setTagDraft] = useState('');
   const deferredKeyword = useDeferredValue(filters.keyword.trim().toLowerCase());
 
-  async function loadQuestions(mode: 'initial' | 'refresh' = 'initial') {
+  async function loadQuestions(mode: 'initial' | 'refresh' | 'background' = 'initial'): Promise<boolean> {
     if (mode === 'initial') {
       setLoadingState('loading');
-    } else {
+    } else if (mode === 'refresh') {
       setIsRefreshing(true);
     }
 
@@ -225,12 +304,21 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
         throw new Error(data.message || '问题列表加载失败。');
       }
 
+      const shouldReconnectStream =
+        mode !== 'background' && (streamKey === 0 || connectionState === 'error');
+
       startTransition(() => {
         setQuestions(data.items ?? []);
         setLoadingState('ready');
-        setConnectionState('live');
+        setConnectionState(shouldReconnectStream ? 'connecting' : 'live');
         setErrorMessage('');
       });
+
+      if (shouldReconnectStream) {
+        setStreamKey((current) => current + 1);
+      }
+
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : '问题列表加载失败。';
       setErrorMessage(message);
@@ -239,6 +327,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
       if (mode === 'initial') {
         setLoadingState('error');
       }
+      return false;
     } finally {
       if (mode === 'refresh') {
         setIsRefreshing(false);
@@ -251,96 +340,153 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadQuestions('refresh');
-    }, POLL_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  const filteredQuestions = useMemo(() => {
-    return [...questions]
-      .filter((question) => {
-        if (filters.route !== 'all' && question.route !== filters.route) {
-          return false;
-        }
-
-        if (filters.archiveState === 'active' && isArchivedStatus(question.displayStatus)) {
-          return false;
-        }
-
-        if (filters.archiveState === 'archived' && !isArchivedStatus(question.displayStatus)) {
-          return false;
-        }
-
-        if (
-          filters.answerStatus !== 'all'
-          && question.answerStatus !== filters.answerStatus
-        ) {
-          return false;
-        }
-
-        const normalizedTag = question.tag.trim();
-
-        if (filters.tag === UNCLASSIFIED_TAG_VALUE && normalizedTag.length > 0) {
-          return false;
-        }
-
-        if (
-          filters.tag !== 'all'
-          && filters.tag !== UNCLASSIFIED_TAG_VALUE
-          && normalizedTag !== filters.tag
-        ) {
-          return false;
-        }
-
-        if (!deferredKeyword) {
-          return true;
-        }
-
-        return (
-          question.text.toLowerCase().includes(deferredKeyword)
-          || question.tag.toLowerCase().includes(deferredKeyword)
-          || ROUTE_LABEL[question.route].includes(deferredKeyword)
-        );
-      })
-      .sort((left, right) => {
-        const statusDelta =
-          Number(isArchivedStatus(left.displayStatus)) - Number(isArchivedStatus(right.displayStatus));
-
-        if (statusDelta !== 0) {
-          return statusDelta;
-        }
-
-        const countDelta = (right.count ?? 1) - (left.count ?? 1);
-
-        if (countDelta !== 0) {
-          return countDelta;
-        }
-
-        return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
-      });
-  }, [deferredKeyword, filters, questions]);
-
-  const tagOptions = useMemo(() => {
-    const options = [{ value: 'all', label: '全部标签' }];
-
-    if (questions.some((question) => question.tag.trim().length === 0)) {
-      options.push({ value: UNCLASSIFIED_TAG_VALUE, label: '未分类' });
+    if (streamKey === 0) {
+      return;
     }
 
-    const tags = Array.from(
-      new Set(
-        questions
-          .map((question) => question.tag.trim())
-          .filter((tag) => tag.length > 0),
-      ),
-    ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+    const closeStream = openAdminEventStream('/api/events', {
+      onOpen: () => {
+        setConnectionState('live');
+        setErrorMessage('');
+        void loadQuestions('background');
+      },
+      onMessage: (message) => {
+        if (message.event === 'connected' || message.event === 'ping') {
+          return;
+        }
 
-    return options.concat(tags.map((tag) => ({ value: tag, label: tag })));
-  }, [questions]);
+        const event = parseRealtimeQuestionEvent(message.data);
+
+        if (!event) {
+          return;
+        }
+
+        startTransition(() => {
+          if (event.type === 'question.deleted') {
+            setQuestions((previous) =>
+              previous.filter((item) => item.id !== event.payload.id),
+            );
+            return;
+          }
+
+          setQuestions((previous) => upsertQuestion(previous, event.payload));
+        });
+      },
+      onError: (error) => {
+        setConnectionState('error');
+        setErrorMessage(error.message);
+      },
+    });
+
+    return () => {
+      closeStream();
+    };
+  }, [streamKey]);
+
+  const { filteredQuestions, tagOptions, summary } = useMemo(() => {
+    const nextFilteredQuestions: Question[] = [];
+    const tags = new Set<string>();
+    let hasUnclassifiedTag = false;
+    let archived = 0;
+    let postAnswered = 0;
+
+    for (const question of questions) {
+      const normalizedTag = getQuestionTagValue(question.tag);
+
+      if (normalizedTag.length === 0) {
+        hasUnclassifiedTag = true;
+      } else {
+        tags.add(normalizedTag);
+      }
+
+      if (isArchivedStatus(question.displayStatus)) {
+        archived += 1;
+      }
+
+      if (question.answerStatus === 'answered_post') {
+        postAnswered += 1;
+      }
+
+      if (filters.route !== 'all' && question.route !== filters.route) {
+        continue;
+      }
+
+      if (filters.archiveState === 'active' && isArchivedStatus(question.displayStatus)) {
+        continue;
+      }
+
+      if (filters.archiveState === 'archived' && !isArchivedStatus(question.displayStatus)) {
+        continue;
+      }
+
+      if (filters.answerStatus !== 'all' && question.answerStatus !== filters.answerStatus) {
+        continue;
+      }
+
+      if (filters.tag === UNCLASSIFIED_TAG_VALUE && normalizedTag.length > 0) {
+        continue;
+      }
+
+      if (
+        filters.tag !== 'all'
+        && filters.tag !== UNCLASSIFIED_TAG_VALUE
+        && normalizedTag !== filters.tag
+      ) {
+        continue;
+      }
+
+      if (deferredKeyword) {
+        const questionText = question.text.toLowerCase();
+        const questionTag = question.tag.toLowerCase();
+
+        if (
+          !questionText.includes(deferredKeyword)
+          && !questionTag.includes(deferredKeyword)
+          && !ROUTE_LABEL[question.route].includes(deferredKeyword)
+        ) {
+          continue;
+        }
+      }
+
+      nextFilteredQuestions.push(question);
+    }
+
+    nextFilteredQuestions.sort((left, right) => {
+      const statusDelta =
+        Number(isArchivedStatus(left.displayStatus)) - Number(isArchivedStatus(right.displayStatus));
+
+      if (statusDelta !== 0) {
+        return statusDelta;
+      }
+
+      const countDelta = (right.count ?? 1) - (left.count ?? 1);
+
+      if (countDelta !== 0) {
+        return countDelta;
+      }
+
+      return compareIsoDateDesc(left.updatedAt, right.updatedAt);
+    });
+
+    const nextTagOptions = [{ value: 'all', label: '全部标签' }];
+
+    if (hasUnclassifiedTag) {
+      nextTagOptions.push({ value: UNCLASSIFIED_TAG_VALUE, label: '未分类' });
+    }
+
+    const sortedTags = Array.from(tags).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+
+    return {
+      filteredQuestions: nextFilteredQuestions,
+      tagOptions: nextTagOptions.concat(sortedTags.map((tag) => ({ value: tag, label: tag }))),
+      summary: {
+        total: questions.length,
+        active: questions.length - archived,
+        archived,
+        postAnswered,
+      },
+    };
+  }, [deferredKeyword, filters, questions]);
 
   useEffect(() => {
     if (filteredQuestions.length === 0) {
@@ -365,20 +511,6 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
   useEffect(() => {
     setTagDraft(selectedQuestion?.tag ?? '');
   }, [selectedQuestion?.id, selectedQuestion?.tag]);
-
-  const summary = useMemo(() => {
-    const total = questions.length;
-    const archived = questions.filter((item) => isArchivedStatus(item.displayStatus)).length;
-    const active = total - archived;
-    const postAnswered = questions.filter((item) => item.answerStatus === 'answered_post').length;
-
-    return {
-      total,
-      active,
-      archived,
-      postAnswered,
-    };
-  }, [questions]);
 
   async function updateQuestion(
     questionId: string,
@@ -867,6 +999,49 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
 
                       <section>
                         <div className="flex items-center gap-2">
+                          <BadgeCheck className="h-4 w-4 text-cyan-100" />
+                          <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
+                            答复推进
+                          </h3>
+                        </div>
+                        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                          {(
+                            [
+                              ['unanswered', '待回答'],
+                              ['answered_live', '已现场回答'],
+                              ['answered_post', '会后补答'],
+                            ] as Array<[AnswerStatus, string]>
+                          ).map(([value, label]) => {
+                            const active = selectedQuestion.answerStatus === value;
+
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() =>
+                                  void updateQuestion(
+                                    selectedQuestion.id,
+                                    { answerStatus: value },
+                                    'answerStatus',
+                                  )
+                                }
+                                disabled={active || !!savingKey}
+                                className={cn(
+                                  'rounded-[1.35rem] border px-4 py-3 text-sm font-medium transition',
+                                  active
+                                    ? 'border-cyan-300/28 bg-cyan-300/12 text-white'
+                                    : 'border-white/8 bg-white/4 text-white/78 hover:border-white/16 hover:bg-white/6',
+                                )}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+
+                      <section>
+                        <div className="flex items-center gap-2">
                           <ShieldAlert className="h-4 w-4 text-cyan-100" />
                           <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
                             归档
@@ -910,49 +1085,6 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                               </button>
                             </div>
                           )}
-                        </div>
-                      </section>
-
-                      <section>
-                        <div className="flex items-center gap-2">
-                          <BadgeCheck className="h-4 w-4 text-cyan-100" />
-                          <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
-                            答复推进
-                          </h3>
-                        </div>
-                        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                          {(
-                            [
-                              ['unanswered', '待回答'],
-                              ['answered_live', '已现场回答'],
-                              ['answered_post', '会后补答'],
-                            ] as Array<[AnswerStatus, string]>
-                          ).map(([value, label]) => {
-                            const active = selectedQuestion.answerStatus === value;
-
-                            return (
-                              <button
-                                key={value}
-                                type="button"
-                                onClick={() =>
-                                  void updateQuestion(
-                                    selectedQuestion.id,
-                                    { answerStatus: value },
-                                    'answerStatus',
-                                  )
-                                }
-                                disabled={active || !!savingKey}
-                                className={cn(
-                                  'rounded-[1.35rem] border px-4 py-3 text-sm font-medium transition',
-                                  active
-                                    ? 'border-cyan-300/28 bg-cyan-300/12 text-white'
-                                    : 'border-white/8 bg-white/4 text-white/78 hover:border-white/16 hover:bg-white/6',
-                                )}
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
                         </div>
                       </section>
                     </div>
@@ -1026,6 +1158,18 @@ function navigateTo(path: string): void {
   window.location.assign(path);
 }
 
+function BoardViewLoadingFallback() {
+  return (
+    <div className="relative min-h-screen w-full overflow-hidden bg-mesh font-sans text-white">
+      <div className="flex min-h-screen items-center justify-center px-8">
+        <div className="rounded-3xl border border-white/10 bg-white/6 px-8 py-6 text-white/75 backdrop-blur-md">
+          正在加载大会展示...
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState<'management' | 'board'>(() => resolvePage());
 
@@ -1044,7 +1188,11 @@ export default function App() {
   }, []);
 
   if (page === 'board') {
-    return <BoardView onOpenManagement={() => navigateTo(MANAGEMENT_PATH)} />;
+    return (
+      <Suspense fallback={<BoardViewLoadingFallback />}>
+        <LazyBoardView onOpenManagement={() => navigateTo(MANAGEMENT_PATH)} />
+      </Suspense>
+    );
   }
 
   return <ManagementView onOpenBoard={() => navigateTo(BOARD_PATH)} />;

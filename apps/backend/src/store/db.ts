@@ -116,6 +116,18 @@ export async function initializeDatabase(): Promise<void> {
     on ${table} (display_status)
   `);
   await pool.query(`
+    create index if not exists ${escapeIdentifier(
+      `${config.database.tablePrefix}questions_display_status_created_at_idx`,
+    )}
+    on ${table} (display_status, created_at desc)
+  `);
+  await pool.query(`
+    create index if not exists ${escapeIdentifier(
+      `${config.database.tablePrefix}questions_display_status_route_created_at_idx`,
+    )}
+    on ${table} (display_status, route, created_at desc)
+  `);
+  await pool.query(`
     create table if not exists ${questionCareSessionsTable} (
       question_id uuid not null references ${table} (id) on delete cascade,
       session_hash varchar(64) not null,
@@ -129,6 +141,12 @@ export async function initializeDatabase(): Promise<void> {
       `${config.database.tablePrefix}question_care_sessions_expires_at_idx`,
     )}
     on ${questionCareSessionsTable} (expires_at)
+  `);
+  await pool.query(`
+    create index if not exists ${escapeIdentifier(
+      `${config.database.tablePrefix}question_care_sessions_session_hash_question_id_expires_at_idx`,
+    )}
+    on ${questionCareSessionsTable} (session_hash, question_id, expires_at)
   `);
   await pool.query(`
     create table if not exists ${settingsTable} (

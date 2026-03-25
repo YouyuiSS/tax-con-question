@@ -14,7 +14,9 @@ import {
   deleteQuestionById,
   getQuestionById,
   incrementQuestionCountById,
+  listBoardQuestions,
   listCaredQuestionIdsBySessionHash,
+  listPublicQuestions,
   listQuestions,
   updateQuestionById,
 } from '../store/questions.js';
@@ -188,14 +190,6 @@ function broadcastBoardQuestionCreated(question: Question): void {
 }
 
 function broadcastBoardQuestionUpdated(question: Question): void {
-  if (!isBoardVisibleQuestion(question)) {
-    broadcastBoard({
-      type: 'question.deleted',
-      payload: { id: question.id },
-    });
-    return;
-  }
-
   broadcastBoard({
     type: 'question.updated',
     payload: toBoardQuestionView(question),
@@ -287,10 +281,7 @@ export function createQuestionsRouter(): Router {
     try {
       const sessionId = ensureCareSessionId(_req, res);
       const sessionHash = hashCareSessionId(sessionId);
-      const items = await listQuestions(undefined, 'show_raw');
-      const visibleQuestions = items.filter((question) =>
-        isPubliclyVisibleQuestion(question)
-      );
+      const visibleQuestions = await listPublicQuestions();
       const caredQuestionIds = new Set(
         await listCaredQuestionIdsBySessionHash(
           sessionHash,
@@ -309,10 +300,8 @@ export function createQuestionsRouter(): Router {
 
   router.get('/board', requireAdminAuth, async (_req, res, next) => {
     try {
-      const items = await listQuestions();
-      const visibleItems = items
-        .filter(isBoardVisibleQuestion)
-        .map(toBoardQuestionView);
+      const items = await listBoardQuestions();
+      const visibleItems = items.map(toBoardQuestionView);
 
       res.json({ items: visibleItems });
     } catch (error) {

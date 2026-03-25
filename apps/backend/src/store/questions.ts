@@ -22,6 +22,13 @@ type QuestionCareSessionRow = {
   question_id: string;
 };
 
+const BOARD_VISIBLE_STATUSES: Question['displayStatus'][] = [
+  'pending',
+  'show_raw',
+  'count_only',
+  'redirect_official',
+];
+
 function mapQuestionRow(row: QuestionRow): Question {
   return {
     id: row.id,
@@ -65,6 +72,38 @@ export async function listQuestions(
       order by created_at desc
     `,
     params,
+  );
+
+  return result.rows.map(mapQuestionRow);
+}
+
+export async function listPublicQuestions(
+  execute: SqlExecutor = query,
+): Promise<Question[]> {
+  const result = await execute<QuestionRow>(
+    `
+      select id, text, tag, route, display_status, answer_status, count, created_at, updated_at
+      from {{questions}}
+      where display_status = 'show_raw'
+        and route = 'public_discuss'
+      order by created_at desc
+    `,
+  );
+
+  return result.rows.map(mapQuestionRow);
+}
+
+export async function listBoardQuestions(
+  execute: SqlExecutor = query,
+): Promise<Question[]> {
+  const result = await execute<QuestionRow>(
+    `
+      select id, text, tag, route, display_status, answer_status, count, created_at, updated_at
+      from {{questions}}
+      where display_status = any($1::varchar[])
+      order by created_at desc
+    `,
+    [BOARD_VISIBLE_STATUSES],
   );
 
   return result.rows.map(mapQuestionRow);

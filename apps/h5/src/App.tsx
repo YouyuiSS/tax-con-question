@@ -108,6 +108,14 @@ function formatRelativeTime(value: string, now: number): string {
   return `${Math.floor(diff / day)}天前`;
 }
 
+function getTopicValue(tag: string): string {
+  return tag.trim();
+}
+
+function compareIsoDateDesc(left: string, right: string): number {
+  return right.localeCompare(left);
+}
+
 function getRouteMeta(route: QuestionRoute, autoPublishEnabled: boolean): RouteMeta {
   const base = BASE_ROUTE_META[route];
 
@@ -189,42 +197,54 @@ export default function App() {
   const validationMessage = useMemo(() => getValidationMessage(text), [text]);
   const canContinue = validationMessage === '';
   const helperMessage = text.length > 0 ? validationMessage : '';
-  const discussionTopics = useMemo(() => {
-    const tags = Array.from(
-      new Set(
-        publicQuestions
-          .map((question) => question.tag.trim())
-          .filter(Boolean),
-      ),
-    );
-
-    return tags.length > 0 ? [ALL_TOPICS, ...tags] : [];
-  }, [publicQuestions]);
-  const filteredQuestions = useMemo(() => {
+  const { discussionTopics, visibleQuestions } = useMemo(() => {
     const normalizedQuery = searchTerm.trim().toLowerCase();
+    const tags = new Set<string>();
+    const nextVisibleQuestions: PublicQuestion[] = [];
 
-    return publicQuestions.filter((question) => {
-      const topic = question.tag.trim();
+    for (const question of publicQuestions) {
+      const topic = getTopicValue(question.tag);
+
+      if (topic) {
+        tags.add(topic);
+      }
+
       const matchesTopic = selectedTopic === ALL_TOPICS || topic === selectedTopic;
-      const matchesQuery = !normalizedQuery
-        || question.text.toLowerCase().includes(normalizedQuery)
-        || topic.toLowerCase().includes(normalizedQuery);
 
-      return matchesTopic && matchesQuery;
-    });
-  }, [publicQuestions, searchTerm, selectedTopic]);
-  const visibleQuestions = useMemo(() => {
-    return [...filteredQuestions].sort((left, right) => {
+      if (!matchesTopic) {
+        continue;
+      }
+
+      if (normalizedQuery) {
+        const matchesQuery =
+          question.text.toLowerCase().includes(normalizedQuery)
+          || topic.toLowerCase().includes(normalizedQuery);
+
+        if (!matchesQuery) {
+          continue;
+        }
+      }
+
+      nextVisibleQuestions.push(question);
+    }
+
+    nextVisibleQuestions.sort((left, right) => {
       if (discussionSort === 'count') {
         const countDelta = (right.count ?? 1) - (left.count ?? 1);
+
         if (countDelta !== 0) {
           return countDelta;
         }
       }
 
-      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      return compareIsoDateDesc(left.createdAt, right.createdAt);
     });
-  }, [discussionSort, filteredQuestions]);
+
+    return {
+      discussionTopics: tags.size > 0 ? [ALL_TOPICS, ...Array.from(tags)] : [],
+      visibleQuestions: nextVisibleQuestions,
+    };
+  }, [discussionSort, publicQuestions, searchTerm, selectedTopic]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -546,7 +566,7 @@ export default function App() {
                   去提问
                 </button>
               </section>
-            ) : filteredQuestions.length === 0 ? (
+            ) : visibleQuestions.length === 0 ? (
               <section className="empty-state">
                 <h2>没有找到相关问题</h2>
                 <p>换个关键词试试，或者返回继续提问。</p>

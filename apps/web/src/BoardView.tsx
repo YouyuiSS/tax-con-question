@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AnimatePresence,
   motion,
@@ -8,8 +8,8 @@ import {
   type MotionValue,
 } from 'motion/react';
 import { Check, Globe, Grid2X2, Sparkles, X } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { adminFetch, getStoredAdminToken } from './lib/adminAuth';
+import { openAdminEventStream } from './lib/adminEventStream';
+import { adminFetch } from './lib/adminAuth';
 import { cn } from './lib/utils';
 
 type QuestionRoute = 'public_discuss' | 'meeting_only';
@@ -18,6 +18,15 @@ type AnswerStatus = 'unanswered' | 'answered_live' | 'answered_post';
 type SortType = 'count' | 'date';
 type ViewMode = 'grid' | 'globe';
 type ConnectionState = 'connecting' | 'live' | 'error';
+type RealtimeBoardEvent =
+  | {
+    type: 'question.created' | 'question.updated';
+    payload: Question;
+  }
+  | {
+    type: 'question.deleted';
+    payload: { id: string };
+  };
 type GlobeLayout = {
   horizontalRadius: number;
   verticalRadius: number;
@@ -42,7 +51,64 @@ type Question = {
 
 const HIGHLIGHT_DURATION_MS = 2600;
 const ALL_TAGS = '全部';
-const BOARD_POLL_INTERVAL_MS = 10000;
+let confettiPromise: Promise<typeof import('canvas-confetti')> | null = null;
+
+function loadConfetti(): Promise<typeof import('canvas-confetti')> {
+  confettiPromise ??= import('canvas-confetti').then((module) =>
+    (module.default ?? module) as typeof import('canvas-confetti')
+  );
+  return confettiPromise;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isRealtimeBoardQuestion(value: unknown): value is Question {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (
+    typeof value.id !== 'string'
+    || typeof value.text !== 'string'
+    || typeof value.tag !== 'string'
+    || typeof value.route !== 'string'
+    || typeof value.displayStatus !== 'string'
+    || typeof value.answerStatus !== 'string'
+    || typeof value.createdAt !== 'string'
+  ) {
+    return false;
+  }
+
+  return value.count === undefined || typeof value.count === 'number';
+}
+
+function parseRealtimeBoardEvent(value: unknown): RealtimeBoardEvent | null {
+  if (!isRecord(value) || typeof value.type !== 'string' || !('payload' in value)) {
+    return null;
+  }
+
+  if (value.type === 'question.created' || value.type === 'question.updated') {
+    return isRealtimeBoardQuestion(value.payload)
+      ? {
+        type: value.type,
+        payload: value.payload,
+      }
+      : null;
+  }
+
+  if (value.type === 'question.deleted') {
+    return isRecord(value.payload) && typeof value.payload.id === 'string'
+      ? {
+        type: value.type,
+        payload: { id: value.payload.id },
+      }
+      : null;
+  }
+
+  return null;
+}
 
 function isVisibleOnBoard(question: Question): boolean {
   return question.displayStatus !== 'archived';
@@ -54,6 +120,10 @@ function getQuestionTagLabel(question: Pick<Question, 'tag'>): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function compareIsoDateDesc(left: string, right: string): number {
+  return right.localeCompare(left);
 }
 
 function getGlobeLayout(
@@ -149,15 +219,43 @@ function upsertQuestion(list: Question[], question: Question): Question[] {
   return [question, ...list];
 }
 
-function QuestionCard({
+function QuestionCardContent({
   q,
-  viewMode,
+  nowTimestamp,
+}: {
+  q: Question;
+  nowTimestamp: number;
+}) {
+  const count = q.count ?? 1;
+  const tagLabel = getQuestionTagLabel(q);
+
+  return (
+    <>
+      <div className="relative z-10">
+        <div className="mb-5 flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-cyan-100/90">
+            {tagLabel}
+          </span>
+        </div>
+
+        <p className="leading-relaxed break-words text-white/92 drop-shadow-md">{q.text}</p>
+      </div>
+
+      <div className="relative z-10 mt-6 flex items-center justify-between gap-4 border-t border-white/10 pt-4 text-sm">
+        <time className="text-white/45">{formatQuestionTime(q.createdAt, nowTimestamp)}</time>
+        <span className="text-white/72">关心人数 {count}</span>
+      </div>
+    </>
+  );
+}
+
+function GridQuestionCard({
+  q,
   nowTimestamp,
   onClick,
   focused = false,
 }: {
   q: Question;
-  viewMode: ViewMode;
   nowTimestamp: number;
   onClick?: () => void;
   focused?: boolean;
@@ -167,23 +265,14 @@ function QuestionCard({
   const rotateX = useTransform(y, [-300, 300], [8, -8]);
   const rotateY = useTransform(x, [-300, 300], [-8, 8]);
   const count = q.count ?? 1;
-  const tagLabel = getQuestionTagLabel(q);
 
   function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
-    if (viewMode === 'globe') {
-      return;
-    }
-
     const rect = event.currentTarget.getBoundingClientRect();
     x.set(event.clientX - rect.left - rect.width / 2);
     y.set(event.clientY - rect.top - rect.height / 2);
   }
 
   function handleMouseLeave() {
-    if (viewMode === 'globe') {
-      return;
-    }
-
     x.set(0);
     y.set(0);
   }
@@ -201,15 +290,15 @@ function QuestionCard({
 
   return (
     <motion.article
-      layout={viewMode === 'grid'}
-      initial={viewMode === 'grid' ? { opacity: 0, scale: 0.85, y: 40 } : undefined}
-      animate={viewMode === 'grid' ? { opacity: 1, scale: 1, y: 0 } : undefined}
-      exit={viewMode === 'grid' ? { opacity: 0, scale: 0.8, filter: 'blur(12px)' } : undefined}
+      layout
+      initial={{ opacity: 0, scale: 0.85, y: 40 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.8, filter: 'blur(12px)' }}
       transition={{
         layout: { type: 'spring', stiffness: 180, damping: 24 },
         opacity: { duration: 0.3 },
       }}
-      style={viewMode === 'grid' ? { rotateX, rotateY, transformPerspective: 1000 } : {}}
+      style={{ rotateX, rotateY, transformPerspective: 1000 }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={onClick}
@@ -223,21 +312,29 @@ function QuestionCard({
         onClick && 'cursor-pointer hover:-translate-y-1',
       )}
     >
-      <div className="relative z-10">
-        <div className="mb-5 flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-cyan-100/90">
-            {tagLabel}
-          </span>
-        </div>
-
-        <p className="leading-relaxed break-words text-white/92 drop-shadow-md">{q.text}</p>
-      </div>
-
-      <div className="relative z-10 mt-6 flex items-center justify-between gap-4 border-t border-white/10 pt-4 text-sm">
-        <time className="text-white/45">{formatQuestionTime(q.createdAt, nowTimestamp)}</time>
-        <span className="text-white/72">关心人数 {count}</span>
-      </div>
+      <QuestionCardContent q={q} nowTimestamp={nowTimestamp} />
     </motion.article>
+  );
+}
+
+function GlobeQuestionCard({
+  q,
+  nowTimestamp,
+}: {
+  q: Question;
+  nowTimestamp: number;
+}) {
+  const count = q.count ?? 1;
+
+  return (
+    <article
+      className={cn(
+        'glass-card holo-sweep relative flex flex-col justify-between rounded-3xl transition-colors duration-500',
+        getCardSizeClass(count),
+      )}
+    >
+      <QuestionCardContent q={q} nowTimestamp={nowTimestamp} />
+    </article>
   );
 }
 
@@ -405,7 +502,7 @@ function GlobeNode({
           delay: (index % 5) * 0.35,
         }}
       >
-        <QuestionCard q={q} viewMode="globe" nowTimestamp={nowTimestamp} />
+        <GlobeQuestionCard q={q} nowTimestamp={nowTimestamp} />
       </motion.div>
     </motion.div>
   );
@@ -421,8 +518,10 @@ export function BoardView({
   const [incomingQueue, setIncomingQueue] = useState<Question[]>([]);
   const [sortType, setSortType] = useState<SortType>('count');
   const [viewMode, setViewMode] = useState<ViewMode>('globe');
+  const [showAnswered, setShowAnswered] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [loadingState, setLoadingState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [streamKey, setStreamKey] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [isGlobeHovered, setIsGlobeHovered] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
@@ -433,6 +532,7 @@ export function BoardView({
   const globalRotation = useMotionValue(0);
   const isPlayingIncomingRef = useRef(false);
   const questionsRef = useRef<Question[]>([]);
+  const displayedQuestionsRef = useRef<Question[]>([]);
   const incomingQueueRef = useRef<Question[]>([]);
   const highlightedQuestionRef = useRef<Question | null>(null);
   const questionStatusRef = useRef<Map<string, AnswerStatus>>(new Map());
@@ -447,6 +547,85 @@ export function BoardView({
     topSafeInset: 112,
     bottomSafeInset: 36,
   });
+  const effectiveSortType: SortType = viewMode === 'globe' ? 'date' : sortType;
+  const {
+    displayedQuestions,
+    displayedQuestionById,
+    sortedQuestions,
+    groupedQuestions,
+    tagOptions,
+    gridQuestions,
+  } = useMemo(() => {
+    const nextDisplayedQuestions: Question[] = [];
+    const nextDisplayedQuestionById = new Map<string, Question>();
+
+    for (const question of questions) {
+      if (showAnswered || !isAnswered(question)) {
+        nextDisplayedQuestions.push(question);
+        nextDisplayedQuestionById.set(question.id, question);
+      }
+    }
+
+    const nextSortedQuestions = [...nextDisplayedQuestions].sort((left, right) => {
+      if (effectiveSortType === 'count') {
+        const countDelta = (right.count ?? 1) - (left.count ?? 1);
+
+        if (countDelta !== 0) {
+          return countDelta;
+        }
+      }
+
+      return compareIsoDateDesc(left.createdAt, right.createdAt);
+    });
+
+    const groups = new Map<string, { tag: string; items: Question[]; count: number; totalCare: number }>();
+    let totalCare = 0;
+
+    for (const question of nextSortedQuestions) {
+      const tag = getQuestionTagLabel(question);
+      const count = question.count ?? 1;
+      totalCare += count;
+
+      const existing = groups.get(tag);
+
+      if (existing) {
+        existing.items.push(question);
+        existing.count += 1;
+        existing.totalCare += count;
+      } else {
+        groups.set(tag, {
+          tag,
+          items: [question],
+          count: 1,
+          totalCare: count,
+        });
+      }
+    }
+
+    const nextGroupedQuestions = Array.from(groups.values());
+
+    return {
+      displayedQuestions: nextDisplayedQuestions,
+      displayedQuestionById: nextDisplayedQuestionById,
+      sortedQuestions: nextSortedQuestions,
+      groupedQuestions: nextGroupedQuestions,
+      tagOptions: [
+        {
+          tag: ALL_TAGS,
+          count: nextSortedQuestions.length,
+          totalCare,
+        },
+        ...nextGroupedQuestions,
+      ],
+      gridQuestions: selectedTag === ALL_TAGS
+        ? nextSortedQuestions
+        : groups.get(selectedTag)?.items ?? [],
+    };
+  }, [effectiveSortType, questions, selectedTag, showAnswered]);
+  const answeredQuestionIdSet = useMemo(
+    () => new Set(answeredQuestionIds),
+    [answeredQuestionIds],
+  );
 
   useAnimationFrame((_time, delta) => {
     if (!isGlobeHovered && viewMode === 'globe') {
@@ -467,6 +646,10 @@ export function BoardView({
   useEffect(() => {
     questionsRef.current = questions;
   }, [questions]);
+
+  useEffect(() => {
+    displayedQuestionsRef.current = displayedQuestions;
+  }, [displayedQuestions]);
 
   useEffect(() => {
     incomingQueueRef.current = incomingQueue;
@@ -511,6 +694,59 @@ export function BoardView({
     if (previousStatus !== 'unanswered') {
       setAnsweredCount((current) => Math.max(0, current - 1));
     }
+  }
+
+  function removeBoardQuestion(questionId: string) {
+    removeQuestionSnapshot(questionId);
+    setQuestions((previous) => previous.filter((item) => item.id !== questionId));
+    setIncomingQueue((previous) => previous.filter((item) => item.id !== questionId));
+    setHighlightedQuestion((current) => (current?.id === questionId ? null : current));
+    setFocusedQuestionId((current) => (current === questionId ? null : current));
+  }
+
+  function syncKnownQuestion(question: Question): boolean {
+    if (incomingQueueRef.current.some((item) => item.id === question.id)) {
+      setIncomingQueue((previous) =>
+        previous.map((item) => (item.id === question.id ? question : item)),
+      );
+      return true;
+    }
+
+    if (highlightedQuestionRef.current?.id === question.id) {
+      setHighlightedQuestion((current) => (current?.id === question.id ? question : current));
+      return true;
+    }
+
+    if (questionsRef.current.some((item) => item.id === question.id)) {
+      setQuestions((previous) => upsertQuestion(previous, question));
+      return true;
+    }
+
+    return false;
+  }
+
+  function applyCreatedQuestion(question: Question) {
+    upsertQuestionSnapshot(question);
+
+    if (syncKnownQuestion(question)) {
+      return;
+    }
+
+    setIncomingQueue((previous) =>
+      previous.some((item) => item.id === question.id)
+        ? previous.map((item) => (item.id === question.id ? question : item))
+        : [...previous, question],
+    );
+  }
+
+  function applyUpdatedQuestion(question: Question) {
+    upsertQuestionSnapshot(question);
+
+    if (syncKnownQuestion(question)) {
+      return;
+    }
+
+    setQuestions((previous) => upsertQuestion(previous, question));
   }
 
   function syncBoardSnapshot(items: Question[], mode: 'initial' | 'refresh') {
@@ -577,15 +813,15 @@ export function BoardView({
       return;
     }
 
-    const updateLayout = () => {
-      const { width, height } = container.getBoundingClientRect();
+      const updateLayout = () => {
+        const { width, height } = container.getBoundingClientRect();
 
-      if (width <= 0 || height <= 0) {
-        return;
-      }
+        if (width <= 0 || height <= 0) {
+          return;
+        }
 
-      setGlobeLayout(getGlobeLayout(width, height, questionsRef.current.length));
-    };
+        setGlobeLayout(getGlobeLayout(width, height, displayedQuestionsRef.current.length));
+      };
 
     updateLayout();
 
@@ -600,16 +836,12 @@ export function BoardView({
       observer.disconnect();
       window.removeEventListener('resize', updateLayout);
     };
-  }, [questions.length, viewMode]);
+  }, [displayedQuestions.length, viewMode]);
 
   useEffect(() => {
     let isCancelled = false;
 
-    async function loadQuestions(mode: 'initial' | 'refresh') {
-      if (mode === 'refresh' && !getStoredAdminToken()) {
-        return;
-      }
-
+    async function loadQuestions(mode: 'initial' | 'refresh'): Promise<boolean> {
       try {
         const response = await adminFetch('/api/questions/board');
         const data = (await response.json().catch(() => null)) as {
@@ -623,6 +855,13 @@ export function BoardView({
 
         if (!isCancelled && Array.isArray(data?.items)) {
           syncBoardSnapshot(data.items, mode);
+
+          if (mode === 'initial' && streamKey === 0) {
+            setConnectionState('connecting');
+            setStreamKey((current) => current + 1);
+          }
+
+          return true;
         }
       } catch (error) {
         if (!isCancelled) {
@@ -634,100 +873,113 @@ export function BoardView({
           }
         }
       }
+
+      return false;
     }
 
     void loadQuestions('initial');
-    const timer = window.setInterval(() => {
-      void loadQuestions('refresh');
-    }, BOARD_POLL_INTERVAL_MS);
 
     return () => {
       isCancelled = true;
-      window.clearInterval(timer);
     };
   }, []);
 
   useEffect(() => {
-    if (incomingQueue.length === 0 || isPlayingIncomingRef.current) {
+    if (streamKey === 0) {
       return;
     }
 
-    const nextQuestion = incomingQueue[0];
-    isPlayingIncomingRef.current = true;
-    setHighlightedQuestion(nextQuestion);
+    const closeStream = openAdminEventStream('/api/events/board', {
+      onOpen: () => {
+        setConnectionState('live');
+        setErrorMessage('');
+        void adminFetch('/api/questions/board')
+          .then(async (response) => {
+            const data = (await response.json().catch(() => null)) as {
+              items?: Question[];
+            } | null;
 
-    confetti({
-      particleCount: 70,
-      spread: 90,
-      origin: { y: 0.55 },
-      colors: ['#22d3ee', '#38bdf8', '#a855f7'],
-      disableForReducedMotion: true,
-      zIndex: 120,
+            if (response.ok && Array.isArray(data?.items)) {
+              syncBoardSnapshot(data.items, 'refresh');
+            }
+          })
+          .catch(() => {});
+      },
+      onMessage: (message) => {
+        if (message.event === 'connected' || message.event === 'ping') {
+          return;
+        }
+
+        const event = parseRealtimeBoardEvent(message.data);
+
+        if (!event) {
+          return;
+        }
+
+        startTransition(() => {
+          if (event.type === 'question.deleted') {
+            removeBoardQuestion(event.payload.id);
+            return;
+          }
+
+          if (event.type === 'question.created') {
+            applyCreatedQuestion(event.payload);
+            return;
+          }
+
+          applyUpdatedQuestion(event.payload);
+        });
+      },
+      onError: (error) => {
+        setConnectionState('error');
+        setErrorMessage(error.message);
+      },
     });
 
+    return () => {
+      closeStream();
+    };
+  }, [streamKey]);
+
+  const nextIncomingQuestion = incomingQueue[0] ?? null;
+
+  useEffect(() => {
+    if (!nextIncomingQuestion || isPlayingIncomingRef.current) {
+      return;
+    }
+
+    isPlayingIncomingRef.current = true;
+    setHighlightedQuestion(nextIncomingQuestion);
+
+    void loadConfetti()
+      .then((confetti) => {
+        confetti({
+          particleCount: 70,
+          spread: 90,
+          origin: { y: 0.55 },
+          colors: ['#22d3ee', '#38bdf8', '#a855f7'],
+          disableForReducedMotion: true,
+          zIndex: 120,
+        });
+      })
+      .catch(() => {});
+
     const timer = window.setTimeout(() => {
-      setQuestions((previous) => upsertQuestion(previous, nextQuestion));
-      setHighlightedQuestion(null);
+      setQuestions((previous) => upsertQuestion(previous, nextIncomingQuestion));
+      setHighlightedQuestion((current) =>
+        current?.id === nextIncomingQuestion.id ? null : current,
+      );
       setIncomingQueue((previous) =>
-        previous.filter((item) => item.id !== nextQuestion.id),
+        previous.filter((item) => item.id !== nextIncomingQuestion.id),
       );
       isPlayingIncomingRef.current = false;
     }, HIGHLIGHT_DURATION_MS);
 
     return () => {
       window.clearTimeout(timer);
+      isPlayingIncomingRef.current = false;
     };
-  }, [incomingQueue]);
-
-  const effectiveSortType: SortType = viewMode === 'globe' ? 'date' : sortType;
-
-  const sortedQuestions = useMemo(() => {
-    return [...questions].sort((left, right) => {
-      if (effectiveSortType === 'count') {
-        const countDelta = (right.count ?? 1) - (left.count ?? 1);
-
-        if (countDelta !== 0) {
-          return countDelta;
-        }
-      }
-
-      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
-    });
-  }, [effectiveSortType, questions]);
-
-  const groupedQuestions = useMemo(() => {
-    const groups = new Map<string, Question[]>();
-
-    for (const question of sortedQuestions) {
-      const tag = question.tag.trim() || '未分类';
-      const existing = groups.get(tag);
-
-      if (existing) {
-        existing.push(question);
-      } else {
-        groups.set(tag, [question]);
-      }
-    }
-
-    return Array.from(groups.entries()).map(([tag, items]) => ({
-      tag,
-      items,
-      count: items.length,
-      totalCare: items.reduce((sum, item) => sum + (item.count ?? 1), 0),
-    }));
-  }, [sortedQuestions]);
-
-  const tagOptions = useMemo(
-    () => [
-      {
-        tag: ALL_TAGS,
-        count: sortedQuestions.length,
-        totalCare: sortedQuestions.reduce((sum, item) => sum + (item.count ?? 1), 0),
-      },
-      ...groupedQuestions,
-    ],
-    [groupedQuestions, sortedQuestions],
-  );
+  }, [nextIncomingQuestion?.id]);
 
   useEffect(() => {
     if (!tagOptions.some((option) => option.tag === selectedTag)) {
@@ -741,17 +993,9 @@ export function BoardView({
     }
   }, [viewMode]);
 
-  const gridQuestions = useMemo(() => {
-    if (selectedTag === ALL_TAGS) {
-      return sortedQuestions;
-    }
-
-    return sortedQuestions.filter((question) => (question.tag.trim() || '未分类') === selectedTag);
-  }, [selectedTag, sortedQuestions]);
-
   const focusedQuestion = useMemo(
-    () => questions.find((question) => question.id === focusedQuestionId) ?? null,
-    [focusedQuestionId, questions],
+    () => (focusedQuestionId ? displayedQuestionById.get(focusedQuestionId) ?? null : null),
+    [displayedQuestionById, focusedQuestionId],
   );
 
   useEffect(() => {
@@ -783,7 +1027,7 @@ export function BoardView({
   }, [focusedQuestionId]);
 
   async function markQuestionAnswered(questionId: string) {
-    if (answeredQuestionIds.includes(questionId)) {
+    if (answeredQuestionIdSet.has(questionId)) {
       return;
     }
 
@@ -798,7 +1042,6 @@ export function BoardView({
         },
         body: JSON.stringify({
           answerStatus: 'answered_live',
-          displayStatus: 'archived',
         }),
       });
 
@@ -809,13 +1052,12 @@ export function BoardView({
 
       const updated = (await response.json()) as Question;
 
-      upsertQuestionSnapshot(updated);
-      if (!isVisibleOnBoard(updated)) {
-        removeQuestionSnapshot(questionId);
-        setQuestions((previous) => previous.filter((item) => item.id !== questionId));
-      } else {
-        setQuestions((previous) => upsertQuestion(previous, updated));
+      if (connectionState === 'error') {
+        setConnectionState('connecting');
+        setStreamKey((current) => current + 1);
       }
+
+      applyUpdatedQuestion(updated);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '标记已回答失败。');
     } finally {
@@ -932,7 +1174,7 @@ export function BoardView({
           </div>
           <div className="space-y-4">
             <div>
-              <p className="text-5xl font-mono font-black text-white">{questions.length}</p>
+              <p className="text-5xl font-mono font-black text-white">{sortedQuestions.length}</p>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/45">Visible Questions</p>
             </div>
             <div className="border-t border-white/8 pt-3">
@@ -963,9 +1205,13 @@ export function BoardView({
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-cyan-300/12 text-cyan-200">
                 <Sparkles className="h-7 w-7" />
               </div>
-              <h2 className="mb-3 text-3xl font-bold text-white">等待新问题进入现场</h2>
+              <h2 className="mb-3 text-3xl font-bold text-white">
+                {questions.length > 0 ? '当前没有待展示问题' : '等待新问题进入现场'}
+              </h2>
               <p className="text-base leading-8 text-white/68">
-                新提交的问题会直接出现在这里，归档后会从大屏移出。
+                {questions.length > 0
+                  ? '已回答默认不展示，可在右下角开启查看。'
+                  : '新提交的问题会直接出现在这里。'}
               </p>
             </div>
           </div>
@@ -1007,10 +1253,9 @@ export function BoardView({
               <motion.div layout className="flex flex-wrap gap-8">
                 <AnimatePresence mode="popLayout">
                   {gridQuestions.map((question) => (
-                    <QuestionCard
+                    <GridQuestionCard
                       key={question.id}
                       q={question}
-                      viewMode="grid"
                       nowTimestamp={nowTimestamp}
                       onClick={() => setFocusedQuestionId(question.id)}
                       focused={focusedQuestionId === question.id}
@@ -1051,7 +1296,7 @@ export function BoardView({
             nowTimestamp={nowTimestamp}
             onClose={() => setFocusedQuestionId(null)}
             onMarkAnswered={() => void markQuestionAnswered(focusedQuestion.id)}
-            markingAnswered={answeredQuestionIds.includes(focusedQuestion.id)}
+            markingAnswered={answeredQuestionIdSet.has(focusedQuestion.id)}
           />
         ) : null}
       </AnimatePresence>
@@ -1090,6 +1335,37 @@ export function BoardView({
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      <div className="pointer-events-auto fixed bottom-6 right-8 z-30">
+        <button
+          type="button"
+          onClick={() => setShowAnswered((current) => !current)}
+          className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-left shadow-[0_10px_30px_rgba(15,23,42,0.24)] backdrop-blur-md transition hover:border-white/16 hover:bg-white/8"
+          aria-pressed={showAnswered}
+        >
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/45">Answered</p>
+            <p className="mt-1 text-sm font-medium text-white/82">
+              {showAnswered ? '显示已回答' : '隐藏已回答'}
+            </p>
+          </div>
+          <span
+            className={cn(
+              'relative inline-flex h-7 w-12 rounded-full border transition',
+              showAnswered
+                ? 'border-cyan-300/30 bg-cyan-300/18'
+                : 'border-white/10 bg-white/10',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-1 h-5 w-5 rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.28)] transition-transform',
+                showAnswered ? 'translate-x-6' : 'translate-x-1',
+              )}
+            />
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
