@@ -11,54 +11,54 @@
 
 ## 2. Route Definitions
 
-| Route Code | Display Name | Description |
-| --- | --- | --- |
-| `public_discuss` | 公开讨论 | 审核后进入公开问题池，可在会前被看到 |
-| `meeting_only` | 会上公开 | 会前不公开，进入大会筹备和现场展示 |
+| Route Code       | Display Name | Description                          |
+| ---------------- | ------------ | ------------------------------------ |
+| `public_discuss` | 公开问题     | 审核后进入公开问题池，可在会前被看到 |
+| `meeting_only`   | 会上公开     | 会前不公开，进入大会筹备和现场展示   |
 
 ## 3. Display Status Definitions
 
 适用于 `public_discuss` 和 `meeting_only`。
 
-| Status Code | Display Name | Description |
-| --- | --- | --- |
-| `pending` | 待处理 | 刚提交，尚未归类和处理 |
-| `show_raw` | 原文可展示 | 原文允许在公开池或大会中展示 |
-| `count_only` | 仅计数不展示 | 原文不对外展示，但计入议题频次 |
-| `redirect_official` | 转正式渠道 | 不进入大会流程，转到正式渠道处理 |
-| `archived` | 已归档 | 问题已关闭或不再参与当前流程 |
+| Status Code         | Display Name | Description                      |
+| ------------------- | ------------ | -------------------------------- |
+| `pending`           | 待处理       | 刚提交，尚未归类和处理           |
+| `show_raw`          | 原文可展示   | 原文允许在公开池或大会中展示     |
+| `count_only`        | 仅计数不展示 | 原文不对外展示，但计入议题频次   |
+| `redirect_official` | 转正式渠道   | 不进入大会流程，转到正式渠道处理 |
+| `archived`          | 已归档       | 问题已关闭或不再参与当前流程     |
 
 ## 4. Answer Status Definitions
 
-| Status Code | Display Name | Description |
-| --- | --- | --- |
-| `unanswered` | 待回答 | 尚未现场或会后回应 |
-| `answered_live` | 已现场回答 | 已在大会中回答 |
-| `answered_post` | 会后补答 | 未在现场回答，会后补充 |
+| Status Code     | Display Name | Description            |
+| --------------- | ------------ | ---------------------- |
+| `unanswered`    | 待回答       | 尚未现场或会后回应     |
+| `answered_live` | 已现场回答   | 已在大会中回答         |
+| `answered_post` | 会后补答     | 未在现场回答，会后补充 |
 
 ## 5. Topic Status Definitions
 
-| Status Code | Display Name | Description |
-| --- | --- | --- |
-| `active` | 使用中 | 当前参与大会排序和展示 |
-| `archived` | 已归档 | 不再展示或已完成沉淀 |
+| Status Code | Display Name | Description            |
+| ----------- | ------------ | ---------------------- |
+| `active`    | 使用中       | 当前参与大会排序和展示 |
+| `archived`  | 已归档       | 不再展示或已完成沉淀   |
 
 ## 6. Tables
 
 ### 6.1 `raw_questions`
 
-存放 `公开讨论` 和 `会上公开` 两类原始问题。
+存放 `公开问题` 和 `会上公开` 两类原始问题。
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `id` | `uuid` | yes | 主键 |
-| `route` | `text` | yes | 仅允许 `public_discuss` 或 `meeting_only` |
-| `raw_content` | `text` | yes | 原始问题，不可改写 |
-| `topic_id` | `uuid` | no | 所属议题 |
-| `display_status` | `text` | yes | 默认 `pending` |
-| `answer_status` | `text` | yes | 默认 `unanswered` |
-| `created_at` | `timestamptz` | yes | 创建时间 |
-| `updated_at` | `timestamptz` | yes | 更新时间 |
+| Field            | Type          | Required | Description                               |
+| ---------------- | ------------- | -------- | ----------------------------------------- |
+| `id`             | `uuid`        | yes      | 主键                                      |
+| `route`          | `text`        | yes      | 仅允许 `public_discuss` 或 `meeting_only` |
+| `raw_content`    | `text`        | yes      | 原始问题，不可改写                        |
+| `topic_id`       | `uuid`        | no       | 所属议题                                  |
+| `display_status` | `text`        | yes      | 默认 `pending`                            |
+| `answer_status`  | `text`        | yes      | 默认 `unanswered`                         |
+| `created_at`     | `timestamptz` | yes      | 创建时间                                  |
+| `updated_at`     | `timestamptz` | yes      | 更新时间                                  |
 
 Constraints:
 
@@ -70,14 +70,14 @@ Constraints:
 
 存放大会议题。
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `id` | `uuid` | yes | 主键 |
-| `title` | `varchar(120)` | yes | 议题标题 |
-| `status` | `text` | yes | 默认 `active` |
-| `meeting_order` | `int` | no | 大会展示顺序 |
-| `created_at` | `timestamptz` | yes | 创建时间 |
-| `updated_at` | `timestamptz` | yes | 更新时间 |
+| Field           | Type           | Required | Description   |
+| --------------- | -------------- | -------- | ------------- |
+| `id`            | `uuid`         | yes      | 主键          |
+| `title`         | `varchar(120)` | yes      | 议题标题      |
+| `status`        | `text`         | yes      | 默认 `active` |
+| `meeting_order` | `int`          | no       | 大会展示顺序  |
+| `created_at`    | `timestamptz`  | yes      | 创建时间      |
+| `updated_at`    | `timestamptz`  | yes      | 更新时间      |
 
 Notes:
 
@@ -88,16 +88,16 @@ Notes:
 
 记录会务操作。
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `id` | `uuid` | yes | 主键 |
-| `actor_id` | `varchar(64)` | yes | 操作人 |
-| `action` | `varchar(64)` | yes | 操作类型 |
-| `target_type` | `varchar(32)` | yes | 目标类型 |
-| `target_id` | `uuid` | yes | 目标 ID |
-| `before_data` | `jsonb` | no | 变更前快照 |
-| `after_data` | `jsonb` | no | 变更后快照 |
-| `created_at` | `timestamptz` | yes | 创建时间 |
+| Field         | Type          | Required | Description |
+| ------------- | ------------- | -------- | ----------- |
+| `id`          | `uuid`        | yes      | 主键        |
+| `actor_id`    | `varchar(64)` | yes      | 操作人      |
+| `action`      | `varchar(64)` | yes      | 操作类型    |
+| `target_type` | `varchar(32)` | yes      | 目标类型    |
+| `target_id`   | `uuid`        | yes      | 目标 ID     |
+| `before_data` | `jsonb`       | no       | 变更前快照  |
+| `after_data`  | `jsonb`       | no       | 变更后快照  |
+| `created_at`  | `timestamptz` | yes      | 创建时间    |
 
 Notes:
 
@@ -124,7 +124,7 @@ Notes:
 
 用途：
 
-- 提交 `公开讨论` 或 `会上公开` 的原始问题。
+- 提交 `公开问题` 或 `会上公开` 的原始问题。
 
 Request:
 

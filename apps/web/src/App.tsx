@@ -65,7 +65,7 @@ type SummaryCardProps = {
 };
 
 const ROUTE_LABEL: Record<QuestionRoute, string> = {
-  public_discuss: '公开讨论',
+  public_discuss: '公开问题',
   meeting_only: '会上公开',
 };
 
@@ -90,7 +90,7 @@ const ANSWER_STATUS_BADGE_STYLES: Record<AnswerStatus, string> = {
 
 const ROUTE_OPTIONS = [
   { value: 'all', label: '全部处理方式' },
-  { value: 'public_discuss', label: '公开讨论' },
+  { value: 'public_discuss', label: '公开问题' },
   { value: 'meeting_only', label: '会上公开' },
 ] as const;
 
@@ -502,7 +502,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
           <SummaryCard
             label="总问题数"
             value={summary.total}
-            hint="包含公开讨论和会上公开"
+            hint="包含公开问题和会上公开"
             active={
               filters.route === 'all'
               && filters.archiveState === 'all'
@@ -856,7 +856,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                                   ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100'
                                   : 'border-white/10 bg-white/8 text-white/82 hover:border-white/18 hover:bg-white/10',
                                 (savingKey || tagDraft.trim() === selectedQuestion.tag.trim())
-                                  && 'cursor-not-allowed opacity-60',
+                                && 'cursor-not-allowed opacity-60',
                               )}
                             >
                               {savingKey === `tag:${selectedQuestion.id}` ? '保存中...' : '保存标签'}

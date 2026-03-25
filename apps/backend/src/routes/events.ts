@@ -55,7 +55,7 @@ export function createEventsRouter(): Router {
     setupEventStream(req, res, addAdminClient, removeAdminClient);
   });
 
-  router.get('/board', (req, res) => {
+  router.get('/board', requireAdminAuth, (req, res) => {
     setupEventStream(req, res, addBoardClient, removeBoardClient);
   });
 

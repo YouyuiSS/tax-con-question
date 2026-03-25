@@ -65,7 +65,7 @@ Notes:
 
 - Management write APIs now create audit records in PostgreSQL.
 - The backend exposes `GET /api/admin/audit-logs` with `Authorization: Bearer <ADMIN_TOKEN>`.
-- The `web` app prompts once per browser session for an operator label and sends it as `X-Admin-Actor` to make shared-token audit records easier to distinguish.
+- Audit records currently use a fixed actor label of `admin` because the project does not maintain per-operator identities.
 
 ## One-Click ECS Deploy
 

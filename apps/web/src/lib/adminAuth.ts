@@ -1,25 +1,179 @@
 const ADMIN_TOKEN_STORAGE_KEY = 'tcq_admin_token';
-const ADMIN_ACTOR_STORAGE_KEY = 'tcq_admin_actor';
-const DEFAULT_ADMIN_ACTOR = 'shared_admin_token';
+let pendingAdminTokenPrompt: Promise<string> | null = null;
 
-function promptForAdminToken(message: string): string {
-  if (typeof window === 'undefined') {
-    return '';
+type AdminPromptOptions = {
+  title: string;
+  description: string;
+  inputType: 'text' | 'password';
+  placeholder?: string;
+  defaultValue?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+};
+
+function openAdminPrompt(options: AdminPromptOptions): Promise<string> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve('');
   }
 
-  return window.prompt(message)?.trim() ?? '';
+  return new Promise((resolve) => {
+    const previousActiveElement = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const overlay = document.createElement('div');
+    const dialog = document.createElement('div');
+    const title = document.createElement('h2');
+    const description = document.createElement('p');
+    const form = document.createElement('form');
+    const input = document.createElement('input');
+    const actions = document.createElement('div');
+    const cancelButton = document.createElement('button');
+    const confirmButton = document.createElement('button');
+
+    overlay.style.cssText = [
+      'position:fixed',
+      'inset:0',
+      'z-index:2147483647',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'padding:24px',
+      'background:rgba(2,6,23,0.72)',
+      'backdrop-filter:blur(10px)',
+    ].join(';');
+
+    dialog.style.cssText = [
+      'width:min(100%,420px)',
+      'border:1px solid rgba(148,163,184,0.22)',
+      'border-radius:24px',
+      'background:linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))',
+      'box-shadow:0 24px 80px rgba(15,23,42,0.45)',
+      'padding:24px',
+      'color:#e2e8f0',
+      'font-family:Inter, ui-sans-serif, system-ui, sans-serif',
+    ].join(';');
+
+    title.textContent = options.title;
+    title.style.cssText = 'margin:0;font-size:20px;font-weight:700;line-height:1.4;color:#f8fafc;';
+
+    description.textContent = options.description;
+    description.style.cssText = 'margin:10px 0 0;font-size:14px;line-height:1.7;color:rgba(226,232,240,0.74);';
+
+    form.style.cssText = 'margin-top:20px;';
+
+    input.type = options.inputType;
+    input.value = options.defaultValue ?? '';
+    input.placeholder = options.placeholder ?? '';
+    input.setAttribute(
+      'autocomplete',
+      options.inputType === 'password' ? 'current-password' : 'off',
+    );
+    input.setAttribute('aria-label', options.title);
+    input.style.cssText = [
+      'width:100%',
+      'box-sizing:border-box',
+      'border:1px solid rgba(148,163,184,0.24)',
+      'border-radius:16px',
+      'background:rgba(15,23,42,0.72)',
+      'padding:14px 16px',
+      'font-size:15px',
+      'line-height:1.5',
+      'color:#f8fafc',
+      'outline:none',
+    ].join(';');
+
+    actions.style.cssText = 'margin-top:18px;display:flex;justify-content:flex-end;gap:12px;';
+
+    cancelButton.type = 'button';
+    cancelButton.textContent = options.cancelLabel ?? '取消';
+    cancelButton.style.cssText = [
+      'border:1px solid rgba(148,163,184,0.24)',
+      'border-radius:14px',
+      'background:rgba(15,23,42,0.58)',
+      'padding:10px 16px',
+      'font-size:14px',
+      'color:#cbd5e1',
+      'cursor:pointer',
+    ].join(';');
+
+    confirmButton.type = 'submit';
+    confirmButton.textContent = options.confirmLabel ?? '确认';
+    confirmButton.style.cssText = [
+      'border:0',
+      'border-radius:14px',
+      'background:linear-gradient(135deg, #22c55e, #06b6d4)',
+      'padding:10px 16px',
+      'font-size:14px',
+      'font-weight:600',
+      'color:#082f49',
+      'cursor:pointer',
+    ].join(';');
+
+    let settled = false;
+
+    const cleanup = (value: string) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      window.removeEventListener('keydown', onKeyDown);
+      overlay.remove();
+      previousActiveElement?.focus();
+      resolve(value.trim());
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cleanup('');
+      }
+    };
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      cleanup(input.value);
+    });
+
+    cancelButton.addEventListener('click', () => {
+      cleanup('');
+    });
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) {
+        cleanup('');
+      }
+    });
+
+    actions.append(cancelButton, confirmButton);
+    form.append(input, actions);
+    dialog.append(title, description, form);
+    overlay.append(dialog);
+    document.body.append(overlay);
+    window.addEventListener('keydown', onKeyDown);
+    window.setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
+  });
 }
 
-function promptForAdminActor(): string {
-  if (typeof window === 'undefined') {
-    return DEFAULT_ADMIN_ACTOR;
+async function promptForAdminToken(message: string): Promise<string> {
+  if (pendingAdminTokenPrompt) {
+    return pendingAdminTokenPrompt;
   }
 
-  return (
-    window.prompt('请输入本次管理操作记录名（用于审计日志，可填姓名、缩写或角色名）。留空将记为共享管理员。')
-      ?.trim()
-    || DEFAULT_ADMIN_ACTOR
-  );
+  pendingAdminTokenPrompt = openAdminPrompt({
+    title: '输入管理员令牌',
+    description: message,
+    inputType: 'password',
+    placeholder: '请输入 ADMIN_TOKEN',
+    confirmLabel: '继续',
+  }).finally(() => {
+    pendingAdminTokenPrompt = null;
+  });
+
+  return pendingAdminTokenPrompt;
 }
 
 export function getStoredAdminToken(): string {
@@ -45,23 +199,6 @@ export function setStoredAdminToken(token: string): void {
   window.sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, normalized);
 }
 
-export function getStoredAdminActor(): string {
-  if (typeof window === 'undefined') {
-    return DEFAULT_ADMIN_ACTOR;
-  }
-
-  return window.sessionStorage.getItem(ADMIN_ACTOR_STORAGE_KEY)?.trim() || '';
-}
-
-export function setStoredAdminActor(actor: string): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const normalized = actor.trim() || DEFAULT_ADMIN_ACTOR;
-  window.sessionStorage.setItem(ADMIN_ACTOR_STORAGE_KEY, normalized);
-}
-
 export function clearStoredAdminToken(): void {
   if (typeof window === 'undefined') {
     return;
@@ -70,19 +207,7 @@ export function clearStoredAdminToken(): void {
   window.sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
 }
 
-function ensureAdminActor(): string {
-  const stored = getStoredAdminActor();
-
-  if (stored) {
-    return stored;
-  }
-
-  const entered = promptForAdminActor();
-  setStoredAdminActor(entered);
-  return entered;
-}
-
-function ensureAdminToken(forcePrompt = false): string {
+async function ensureAdminToken(forcePrompt = false): Promise<string> {
   const stored = getStoredAdminToken();
 
   if (!forcePrompt && stored) {
@@ -92,7 +217,7 @@ function ensureAdminToken(forcePrompt = false): string {
   const message = forcePrompt
     ? '管理员令牌无效，请重新输入。'
     : '请输入管理员令牌以继续管理操作。';
-  const entered = promptForAdminToken(message);
+  const entered = await promptForAdminToken(message);
 
   if (!entered) {
     return '';
@@ -109,7 +234,6 @@ export async function adminFetch(
   const requestWithToken = async (token: string): Promise<Response> => {
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
-    headers.set('X-Admin-Actor', ensureAdminActor());
 
     return fetch(input, {
       ...init,
@@ -117,7 +241,7 @@ export async function adminFetch(
     });
   };
 
-  const token = ensureAdminToken();
+  const token = await ensureAdminToken();
 
   if (!token) {
     throw new Error('需要先输入管理员令牌。');
@@ -131,7 +255,7 @@ export async function adminFetch(
 
   clearStoredAdminToken();
 
-  const retryToken = ensureAdminToken(true);
+  const retryToken = await ensureAdminToken(true);
 
   if (!retryToken) {
     throw new Error('管理员令牌无效，请重新输入后再试。');

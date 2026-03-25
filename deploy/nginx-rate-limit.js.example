@@ -1,0 +1,47 @@
+const MINUTE_WINDOW_MS = 60 * 1000;
+const HOUR_WINDOW_MS = 60 * MINUTE_WINDOW_MS;
+
+function ttlUntilNextWindow(nowMs, windowMs) {
+  return (windowMs - (nowMs % windowMs)) + 1000;
+}
+
+function questionsRateLimit(r) {
+  if (r.method !== 'POST') {
+    return '0';
+  }
+
+  const clientIp = r.remoteAddress || '';
+  if (clientIp.length === 0) {
+    return '0';
+  }
+
+  const nowMs = Date.now();
+  const minuteKey = `${clientIp}:minute:${Math.floor(nowMs / MINUTE_WINDOW_MS)}`;
+  const hourKey = `${clientIp}:hour:${Math.floor(nowMs / HOUR_WINDOW_MS)}`;
+
+  try {
+    const minuteCount = ngx.shared.questions_per_minute.incr(
+      minuteKey,
+      1,
+      0,
+      ttlUntilNextWindow(nowMs, MINUTE_WINDOW_MS),
+    );
+    const hourCount = ngx.shared.questions_per_hour.incr(
+      hourKey,
+      1,
+      0,
+      ttlUntilNextWindow(nowMs, HOUR_WINDOW_MS),
+    );
+
+    if (minuteCount > 3 || hourCount > 10) {
+      return '1';
+    }
+
+    return '0';
+  } catch (error) {
+    r.error(`questionsRateLimit failed: ${error}`);
+    return '0';
+  }
+}
+
+export default { questionsRateLimit };

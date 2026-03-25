@@ -4,8 +4,7 @@ import { config } from '../config.js';
 import type { AdminAuthMode } from '../types.js';
 
 const BEARER_PREFIX = 'Bearer ';
-const ADMIN_ACTOR_HEADER = 'x-admin-actor';
-const DEFAULT_ADMIN_ACTOR_LABEL = 'shared_admin_token';
+const DEFAULT_ADMIN_ACTOR_LABEL = 'admin';
 
 function isAuthorizedToken(value: string): boolean {
   const expected = config.adminToken;
@@ -24,22 +23,12 @@ function isAuthorizedToken(value: string): boolean {
   return timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
-function normalizeAdminActorLabel(value: string): string {
-  const normalized = value
-    .replaceAll(/[\u0000-\u001F\u007F]/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .slice(0, 120);
-
-  return normalized || DEFAULT_ADMIN_ACTOR_LABEL;
-}
-
 export function getAuthenticatedAdmin(req: Request): {
   actorLabel: string;
   authMode: AdminAuthMode;
 } {
   return {
-    actorLabel: normalizeAdminActorLabel(req.header(ADMIN_ACTOR_HEADER) ?? ''),
+    actorLabel: DEFAULT_ADMIN_ACTOR_LABEL,
     authMode: 'shared_token',
   };
 }

@@ -13,9 +13,9 @@ This app will host the minimal API and SSE layer for the project.
 
 - `POST /api/questions`
 - `GET /api/questions/public`
-- `GET /api/questions/board`
+- `GET /api/questions/board` with `Authorization: Bearer <ADMIN_TOKEN>`
 - `GET /api/questions` with `Authorization: Bearer <ADMIN_TOKEN>`
-- `GET /api/events/board`
+- `GET /api/events/board` with `Authorization: Bearer <ADMIN_TOKEN>`
 - `GET /api/events` with `Authorization: Bearer <ADMIN_TOKEN>`
 - `GET /api/admin/audit-logs` with `Authorization: Bearer <ADMIN_TOKEN>`
 - `PATCH /api/questions/:id` with `Authorization: Bearer <ADMIN_TOKEN>`
@@ -46,5 +46,5 @@ This app will host the minimal API and SSE layer for the project.
 ## Audit Logging
 
 - Management write actions are written into the `admin_audit_logs` table in the project schema.
-- Audit records store action type, resource id, request path, request method, operator label, and a compact before/after summary.
+- Audit records store action type, resource id, request path, request method, a fixed `admin` actor label, and a compact before/after summary.
 - Question audit records intentionally avoid duplicating question text to reduce extra retention of submitted content.

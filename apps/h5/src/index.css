@@ -533,10 +533,19 @@ input {
 }
 
 .success-visual-core {
-  width: 24px;
-  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
   background: linear-gradient(135deg, #4d6772 0%, #39515c 100%);
+}
+
+.success-check-icon {
+  width: 15px;
+  height: 15px;
+  color: #eef7f6;
 }
 
 .sheet-kicker {
@@ -606,37 +615,200 @@ input {
 
 .success-panel {
   display: flex;
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 32px);
   flex-direction: column;
-  justify-content: center;
+  padding: 6px 4px 10px;
+}
+
+.success-header {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
   align-items: center;
-  gap: 20px;
-  padding: 28px 8px;
+  gap: 12px;
+  padding: 4px 2px 18px;
+}
+
+.success-header-title {
+  margin: 0;
+  color: #32576a;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.success-header-spacer {
+  width: 32px;
+  height: 32px;
+}
+
+.success-body {
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+  width: 100%;
+  padding: 6px 6px 0;
   text-align: center;
 }
 
 .success-copy {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   justify-items: center;
+  max-width: 320px;
 }
 
-.success-badge {
-  width: fit-content;
-  padding: 7px 12px;
+.success-copy h1 {
+  font-size: 34px;
+}
+
+.success-copy p {
+  margin: 0;
+  color: #57666d;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.success-note {
+  color: #6d7d84;
+  font-size: 14px;
+}
+
+.success-divider {
+  width: 100%;
+  height: 1px;
+  margin-top: 2px;
+  background: linear-gradient(90deg, rgba(72, 98, 110, 0), rgba(72, 98, 110, 0.14), rgba(72, 98, 110, 0));
+}
+
+.success-flow-card {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  max-width: 320px;
+}
+
+.success-flow-label {
+  color: #7b888f;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.success-flow-card p {
+  margin: 0;
+  color: #88959b;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.success-scene {
+  position: relative;
+  width: 100%;
+  max-width: 336px;
+  aspect-ratio: 1.62;
+  overflow: hidden;
+  border-radius: 26px;
+  background:
+    linear-gradient(145deg, rgba(252, 252, 249, 0.98), rgba(224, 227, 226, 0.96) 64%, rgba(199, 204, 205, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 22px 36px rgba(67, 82, 89, 0.14);
+}
+
+.success-scene::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.84), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 38%);
+}
+
+.success-scene-surface {
+  position: absolute;
+  inset: auto 0 0;
+  height: 38%;
+  background: linear-gradient(180deg, rgba(246, 246, 242, 0.95), rgba(235, 236, 232, 0.98));
+}
+
+.success-scene-shadow {
+  position: absolute;
+  left: -10%;
+  right: 16%;
+  height: 18%;
   border-radius: 999px;
-  background: #d9ebe0;
-  color: #476158;
-  font-size: 12px;
-  font-weight: 700;
+  background: rgba(189, 193, 192, 0.22);
+  filter: blur(10px);
+  transform: rotate(-16deg);
+}
+
+.success-scene-shadow-primary {
+  top: 18%;
+}
+
+.success-scene-shadow-secondary {
+  top: 34%;
+  left: -4%;
+  right: 22%;
+  height: 15%;
+  opacity: 0.76;
+}
+
+.success-scene-step {
+  position: absolute;
+  left: 6%;
+  right: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(232, 233, 229, 0.88), rgba(245, 245, 241, 0.72));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.success-scene-step-top {
+  bottom: 24%;
+  height: 3px;
+}
+
+.success-scene-step-middle {
+  bottom: 19%;
+  height: 4px;
+}
+
+.success-scene-step-bottom {
+  bottom: 13%;
+  height: 5px;
+}
+
+.success-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+  color: #406171;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.success-link-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .success-actions {
   width: 100%;
 }
 
+.success-footer {
+  margin-top: auto;
+  padding-top: 28px;
+  background: none;
+}
+
 @media (max-width: 420px) {
   .page-shell {
     padding-inline: 12px;
+  }
+
+  .success-copy h1 {
+    font-size: 30px;
   }
 }

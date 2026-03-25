@@ -36,8 +36,12 @@ gpgkey=https://nginx.org/keys/nginx_signing.key
 module_hotfixes=true
 EOF
 
-dnf install -y nginx
+dnf install -y nginx nginx-module-njs
 systemctl enable --now nginx
+
+if ! grep -qxF 'load_module modules/ngx_http_js_module.so;' /etc/nginx/nginx.conf; then
+  sed -i '1iload_module modules/ngx_http_js_module.so;' /etc/nginx/nginx.conf
+fi
 
 echo "Installing Node.js ${NODE_VERSION}..."
 mkdir -p /usr/local/lib/nodejs
@@ -77,7 +81,63 @@ WantedBy=multi-user.target
 EOF
 
 echo "Writing Nginx config..."
+mkdir -p /etc/nginx/njs
+tee /etc/nginx/njs/rate_limit_questions.js <<'EOF'
+const MINUTE_WINDOW_MS = 60 * 1000;
+const HOUR_WINDOW_MS = 60 * MINUTE_WINDOW_MS;
+
+function ttlUntilNextWindow(nowMs, windowMs) {
+  return (windowMs - (nowMs % windowMs)) + 1000;
+}
+
+function questionsRateLimit(r) {
+  if (r.method !== 'POST') {
+    return '0';
+  }
+
+  const clientIp = r.remoteAddress || '';
+  if (clientIp.length === 0) {
+    return '0';
+  }
+
+  const nowMs = Date.now();
+  const minuteKey = `${clientIp}:minute:${Math.floor(nowMs / MINUTE_WINDOW_MS)}`;
+  const hourKey = `${clientIp}:hour:${Math.floor(nowMs / HOUR_WINDOW_MS)}`;
+
+  try {
+    const minuteCount = ngx.shared.questions_per_minute.incr(
+      minuteKey,
+      1,
+      0,
+      ttlUntilNextWindow(nowMs, MINUTE_WINDOW_MS),
+    );
+    const hourCount = ngx.shared.questions_per_hour.incr(
+      hourKey,
+      1,
+      0,
+      ttlUntilNextWindow(nowMs, HOUR_WINDOW_MS),
+    );
+
+    if (minuteCount > 3 || hourCount > 10) {
+      return '1';
+    }
+
+    return '0';
+  } catch (error) {
+    r.error(`questionsRateLimit failed: ${error}`);
+    return '0';
+  }
+}
+
+export default { questionsRateLimit };
+EOF
+
 tee "/etc/nginx/conf.d/${APP_NAME}.conf" <<EOF
+js_import questions_limit from /etc/nginx/njs/rate_limit_questions.js;
+js_shared_dict_zone zone=questions_per_minute:512k timeout=70s type=number evict;
+js_shared_dict_zone zone=questions_per_hour:2M timeout=3700s type=number evict;
+js_set \$questions_rate_limited questions_limit.questionsRateLimit;
+
 server {
     listen 80 default_server;
     server_name _;
@@ -94,6 +154,19 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_read_timeout 3600;
         proxy_buffering off;
+    }
+
+    location = /api/questions {
+        if (\$questions_rate_limited = 1) {
+            return 429;
+        }
+
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location /api/ {

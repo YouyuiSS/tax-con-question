@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { requireAdminAuth } from '../middleware/adminAuth.js';
 import {
@@ -8,13 +8,13 @@ import {
 } from '../lib/adminAudit.js';
 import { createAdminAuditLog } from '../store/adminAuditLogs.js';
 import { broadcastAdmin, broadcastBoard } from '../store/sse.js';
-import { getAppSettings } from '../store/settings.js';
 import { withTransaction } from '../store/db.js';
 import {
   createQuestion,
   deleteQuestionById,
   getQuestionById,
   incrementQuestionCountById,
+  listCaredQuestionIdsBySessionHash,
   listQuestions,
   updateQuestionById,
 } from '../store/questions.js';
@@ -42,8 +42,12 @@ const ALLOWED_ANSWER_STATUSES: AnswerStatus[] = [
   'answered_post',
 ];
 const PUBLIC_TIME_BUCKET_MS = 30 * 60 * 1000;
+const CARE_SESSION_COOKIE_NAME = 'tcq_care_session';
+const CARE_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-type PublicQuestionView = Pick<Question, 'id' | 'text' | 'tag' | 'route' | 'count' | 'createdAt'>;
+type PublicQuestionView = Pick<Question, 'id' | 'text' | 'tag' | 'route' | 'count' | 'createdAt'> & {
+  caredBySession: boolean;
+};
 type BoardQuestionView = Pick<
   Question,
   'id' | 'text' | 'tag' | 'route' | 'displayStatus' | 'answerStatus' | 'count' | 'createdAt'
@@ -71,6 +75,61 @@ function getQuestionIdParam(req: Request): string {
   return value?.[0] ?? '';
 }
 
+function parseCookies(req: Request): Record<string, string> {
+  const header = req.header('cookie') ?? '';
+
+  return header
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce<Record<string, string>>((result, part) => {
+      const separatorIndex = part.indexOf('=');
+
+      if (separatorIndex <= 0) {
+        return result;
+      }
+
+      const key = part.slice(0, separatorIndex).trim();
+      const value = part.slice(separatorIndex + 1).trim();
+
+      if (!key || !value) {
+        return result;
+      }
+
+      result[key] = decodeURIComponent(value);
+      return result;
+    }, {});
+}
+
+function isSecureRequest(req: Request): boolean {
+  if (req.secure) {
+    return true;
+  }
+
+  const forwardedProto = req.header('x-forwarded-proto');
+  return typeof forwardedProto === 'string' && forwardedProto.split(',')[0]?.trim() === 'https';
+}
+
+function ensureCareSessionId(req: Request, res: Response): string {
+  const cookies = parseCookies(req);
+  const existing = cookies[CARE_SESSION_COOKIE_NAME]?.trim();
+  const sessionId = existing && existing.length <= 120 ? existing : randomUUID();
+
+  res.cookie(CARE_SESSION_COOKIE_NAME, sessionId, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isSecureRequest(req),
+    path: '/',
+    maxAge: CARE_SESSION_MAX_AGE_MS,
+  });
+
+  return sessionId;
+}
+
+function hashCareSessionId(sessionId: string): string {
+  return createHash('sha256').update(sessionId).digest('hex');
+}
+
 function bucketTimestamp(value: string): string {
   const timestamp = new Date(value).getTime();
 
@@ -83,16 +142,16 @@ function bucketTimestamp(value: string): string {
   ).toISOString();
 }
 
-function isPubliclyVisibleQuestion(question: Question, autoPublishEnabled: boolean): boolean {
+function isPubliclyVisibleQuestion(question: Question): boolean {
   return question.displayStatus === 'show_raw'
-    && (autoPublishEnabled || question.route === 'public_discuss');
+    && question.route === 'public_discuss';
 }
 
 function isBoardVisibleQuestion(question: Question): boolean {
   return question.displayStatus !== 'archived';
 }
 
-function toPublicQuestionView(question: Question): PublicQuestionView {
+function toPublicQuestionView(question: Question, caredBySession = false): PublicQuestionView {
   return {
     id: question.id,
     text: question.text,
@@ -100,6 +159,7 @@ function toPublicQuestionView(question: Question): PublicQuestionView {
     route: question.route,
     count: question.count ?? 1,
     createdAt: bucketTimestamp(question.createdAt),
+    caredBySession,
   };
 }
 
@@ -225,11 +285,21 @@ export function createQuestionsRouter(): Router {
 
   router.get('/public', async (_req, res, next) => {
     try {
-      const settings = await getAppSettings();
+      const sessionId = ensureCareSessionId(_req, res);
+      const sessionHash = hashCareSessionId(sessionId);
       const items = await listQuestions(undefined, 'show_raw');
-      const visibleItems = items
-        .filter((question) => isPubliclyVisibleQuestion(question, settings.autoPublishEnabled))
-        .map(toPublicQuestionView);
+      const visibleQuestions = items.filter((question) =>
+        isPubliclyVisibleQuestion(question)
+      );
+      const caredQuestionIds = new Set(
+        await listCaredQuestionIdsBySessionHash(
+          sessionHash,
+          visibleQuestions.map((question) => question.id),
+        ),
+      );
+      const visibleItems = visibleQuestions.map((question) =>
+        toPublicQuestionView(question, caredQuestionIds.has(question.id))
+      );
 
       res.json({ items: visibleItems });
     } catch (error) {
@@ -237,7 +307,7 @@ export function createQuestionsRouter(): Router {
     }
   });
 
-  router.get('/board', async (_req, res, next) => {
+  router.get('/board', requireAdminAuth, async (_req, res, next) => {
     try {
       const items = await listQuestions();
       const visibleItems = items
@@ -308,28 +378,34 @@ export function createQuestionsRouter(): Router {
 
   router.post('/:id/care', async (req, res, next) => {
     try {
-      const updated = await incrementQuestionCountById(getQuestionIdParam(req));
+      const sessionId = ensureCareSessionId(req, res);
+      const { question: updated, cared, changed } = await incrementQuestionCountById(
+        getQuestionIdParam(req),
+        hashCareSessionId(sessionId),
+        new Date(Date.now() + CARE_SESSION_MAX_AGE_MS).toISOString(),
+      );
 
       if (!updated) {
         res.status(404).json({ message: 'Question not found.' });
         return;
       }
 
-      const settings = await getAppSettings();
-
-      if (!isPubliclyVisibleQuestion(updated, settings.autoPublishEnabled)) {
+      if (!isPubliclyVisibleQuestion(updated)) {
         res.status(404).json({ message: 'Question not found.' });
         return;
       }
 
-      const event: QuestionEvent = {
-        type: 'question.updated',
-        payload: updated,
-      };
+      if (changed) {
+        const event: QuestionEvent = {
+          type: 'question.updated',
+          payload: updated,
+        };
 
-      broadcastAdmin(event);
-      broadcastBoardQuestionUpdated(updated);
-      res.json(toPublicQuestionView(updated));
+        broadcastAdmin(event);
+        broadcastBoardQuestionUpdated(updated);
+      }
+
+      res.json(toPublicQuestionView(updated, cared));
     } catch (error) {
       next(error);
     }

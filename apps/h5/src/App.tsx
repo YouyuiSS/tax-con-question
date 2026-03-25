@@ -14,6 +14,7 @@ type PublicQuestion = {
   route: QuestionRoute;
   count: number;
   createdAt: string;
+  caredBySession: boolean;
 };
 
 type AppSettings = {
@@ -39,7 +40,7 @@ const BASE_ROUTE_META: Record<QuestionRoute, RouteMeta> = {
     successNote: '会前不公开。',
   },
   public_discuss: {
-    title: '公开讨论',
+    title: '公开问题',
     description: '提交后进入公开池，其他同事可以看到。',
     confirmBody: '你的问题提交后会进入公开池，其他同事可以看到。',
     successBody: '你的问题已收到，已进入公开池。',
@@ -47,6 +48,7 @@ const BASE_ROUTE_META: Record<QuestionRoute, RouteMeta> = {
 };
 
 const ROUTE_ORDER: QuestionRoute[] = ['public_discuss', 'meeting_only'];
+const DEFAULT_ROUTE: QuestionRoute = 'public_discuss';
 const DEFAULT_SETTINGS: AppSettings = {
   autoPublishEnabled: false,
 };
@@ -55,12 +57,10 @@ const MIN_LENGTH = 10;
 const MAX_LENGTH = 500;
 const REQUEST_TIMEOUT_MS = 10000;
 const ALL_TOPICS = '全部';
-const CARED_QUESTION_IDS_KEY = 'tcq_cared_question_ids';
 const INPUT_HINT = '把你真正关心、想被回应的问题写下来。尽量聚焦问题本身，避免涉及敏感或违规内容。';
 const RISK_NOTES = [
   '默认不收集姓名、工号等实名字段。',
   '请避免填写具体人名、项目名、时间点等可识别信息。',
-  '当前版本适合非实名收集，不建议提交高风险敏感内容。',
 ] as const;
 
 function getValidationMessage(text: string): string {
@@ -115,24 +115,51 @@ function getRouteMeta(route: QuestionRoute, autoPublishEnabled: boolean): RouteM
     return base;
   }
 
+  if (route === 'public_discuss') {
+    return {
+      title: base.title,
+      description: '提交后会直接进入公开问题池。',
+      confirmBody: '你的问题提交后会直接进入公开问题池。',
+      confirmNote: '本次不经过人工处理。',
+      successBody: '你的问题已收到，已直接进入公开问题池。',
+      successNote: '本次为自动直出。',
+    };
+  }
+
   return {
     title: base.title,
-    description: '当前已开启自动直出，提交后会直接进入公开池和大屏。',
-    confirmBody: '你的问题提交后会直接进入公开池和大屏。',
+    description: '提交后会在大会期间展示，会前不会进入公开问题池。',
+    confirmBody: '你的问题提交后会直接进入大会展示流程，会前不会进入公开问题池。',
     confirmNote: '本次不经过人工处理。',
-    successBody: '你的问题已收到，已直接进入公开池和大屏。',
-    successNote: '本次为自动直出。',
+    successBody: '你的问题已收到，已进入大会展示流程。',
+    successNote: '会前不会进入公开问题池。',
   };
+}
+
+function getSuccessFlowBody(route: QuestionRoute, autoPublishEnabled: boolean): string {
+  if (autoPublishEnabled) {
+    if (route === 'meeting_only') {
+      return '问题已直接进入大会展示流程，会前不会出现在公开池。';
+    }
+
+    return '问题已直接进入公开池和大会展示流程，现场会继续按当前节奏处理。';
+  }
+
+  if (route === 'meeting_only') {
+    return '提交后会进入大会展示流程，会前不会进入公开池。';
+  }
+
+  return '提交后会进入公开池，其他同事可以继续查看并表达关心。';
 }
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>('ask');
   const [text, setText] = useState('');
-  const [route, setRoute] = useState<QuestionRoute>('meeting_only');
+  const [route, setRoute] = useState<QuestionRoute>(DEFAULT_ROUTE);
   const [submissionState, setSubmissionState] = useState<SubmissionState>('form');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [submittedRoute, setSubmittedRoute] = useState<QuestionRoute>('meeting_only');
+  const [submittedRoute, setSubmittedRoute] = useState<QuestionRoute>(DEFAULT_ROUTE);
   const [submittedAutoPublish, setSubmittedAutoPublish] = useState(false);
   const [publicQuestions, setPublicQuestions] = useState<PublicQuestion[]>([]);
   const [isPublicLoading, setIsPublicLoading] = useState(false);
@@ -142,7 +169,6 @@ export default function App() {
   const [selectedTopic, setSelectedTopic] = useState(ALL_TOPICS);
   const [discussionSort, setDiscussionSort] = useState<DiscussionSort>('count');
   const [discussionReloadKey, setDiscussionReloadKey] = useState(0);
-  const [caredQuestionIds, setCaredQuestionIds] = useState<string[]>([]);
   const [caringQuestionId, setCaringQuestionId] = useState('');
   const [recentlyCaredQuestionId, setRecentlyCaredQuestionId] = useState('');
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
@@ -153,6 +179,10 @@ export default function App() {
   );
   const submittedRouteMeta = useMemo(
     () => getRouteMeta(submittedRoute, submittedAutoPublish),
+    [submittedAutoPublish, submittedRoute],
+  );
+  const successFlowBody = useMemo(
+    () => getSuccessFlowBody(submittedRoute, submittedAutoPublish),
     [submittedAutoPublish, submittedRoute],
   );
 
@@ -195,20 +225,6 @@ export default function App() {
       return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
     });
   }, [discussionSort, filteredQuestions]);
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(CARED_QUESTION_IDS_KEY);
-      if (!stored) return;
-
-      const parsed = JSON.parse(stored) as unknown;
-      if (Array.isArray(parsed)) {
-        setCaredQuestionIds(parsed.filter((item): item is string => typeof item === 'string'));
-      }
-    } catch (_error) {
-      window.localStorage.removeItem(CARED_QUESTION_IDS_KEY);
-    }
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -349,9 +365,10 @@ export default function App() {
       }
 
       setSubmittedRoute(route);
-      setSubmittedAutoPublish(data?.displayStatus === 'show_raw');
+      setSubmittedAutoPublish(appSettings.autoPublishEnabled);
       setSubmissionState('success');
       setText('');
+      setRoute(DEFAULT_ROUTE);
     } catch (error) {
       const message = error instanceof Error && error.name === 'AbortError'
         ? '提交超时，请稍后重试。'
@@ -393,7 +410,7 @@ export default function App() {
   }
 
   async function careQuestion(id: string): Promise<void> {
-    if (caredQuestionIds.includes(id) || caringQuestionId) {
+    if (caringQuestionId) {
       return;
     }
 
@@ -413,14 +430,17 @@ export default function App() {
       const updated = (await response.json()) as PublicQuestion;
 
       setPublicQuestions((previous) =>
-        previous.map((question) => (question.id === updated.id ? updated : question)),
+        previous.map((question) =>
+          question.id === updated.id
+            ? {
+              ...question,
+              count: updated.count,
+              caredBySession: updated.caredBySession,
+            }
+            : question
+        ),
       );
-      setRecentlyCaredQuestionId(updated.id);
-      setCaredQuestionIds((previous) => {
-        const next = previous.includes(id) ? previous : [...previous, id];
-        window.localStorage.setItem(CARED_QUESTION_IDS_KEY, JSON.stringify(next));
-        return next;
-      });
+      setRecentlyCaredQuestionId(updated.caredBySession ? updated.id : '');
     } catch (error) {
       setCareErrorMessage(
         error instanceof Error ? error.message : '操作失败，请稍后再试。',
@@ -544,7 +564,7 @@ export default function App() {
                 {careErrorMessage ? <div className="submit-error">{careErrorMessage}</div> : null}
                 <section className="discussion-list">
                   {visibleQuestions.map((question) => {
-                    const isCared = caredQuestionIds.includes(question.id);
+                    const isCared = question.caredBySession;
                     const isCaring = caringQuestionId === question.id;
                     const careButtonClass = [
                       'care-button',
@@ -563,9 +583,9 @@ export default function App() {
                           <button
                             type="button"
                             className={careButtonClass}
-                            disabled={isCared || isCaring}
+                            disabled={isCaring}
                             onClick={() => careQuestion(question.id)}
-                            aria-label={isCared ? '已关心' : '我也关心'}
+                            aria-label={isCared ? '取消关心' : '我也关心'}
                           >
                             <svg
                               className="care-icon"
@@ -597,36 +617,100 @@ export default function App() {
           </>
         ) : submissionState === 'success' ? (
           <section className="success-panel">
-            <div className="success-visual" aria-hidden="true">
-              <div className="success-visual-ring">
-                <div className="success-visual-core" />
-              </div>
-            </div>
-            <div className="success-copy">
-              <div className="success-badge">已收到</div>
-              <h1>提交成功</h1>
-              <p>{submittedRouteMeta.successBody}</p>
-            </div>
-            <div className="summary-card">
-              <span className="summary-label">处理方式</span>
-              <strong>{submittedRouteMeta.title}</strong>
-              {submittedRouteMeta.successNote ? (
-                <p className="summary-note">{submittedRouteMeta.successNote}</p>
-              ) : null}
-            </div>
-            <div className="page-button-stack success-actions">
-              <button className="primary-button" onClick={resetForm}>
-                继续提问
-              </button>
-              {submittedRoute === 'public_discuss' || submittedAutoPublish ? (
-                <button
-                  className="secondary-button"
-                  onClick={() => openDiscussion({ fromSuccess: true })}
+            <header className="success-header">
+              <button
+                className="back-button compact-nav-button"
+                onClick={resetForm}
+                aria-label="返回继续提问"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
                 >
-                  查看公开问题
-                </button>
-              ) : null}
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <p className="success-header-title">提交成功</p>
+              <span className="success-header-spacer" aria-hidden="true" />
+            </header>
+
+            <div className="success-body">
+              <div className="success-visual" aria-hidden="true">
+                <div className="success-visual-ring">
+                  <div className="success-visual-core">
+                    <svg
+                      className="success-check-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2.4"
+                    >
+                      <path d="m7.5 12.4 3.1 3.1 6-6.6" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div className="success-copy">
+                <h1>提交成功</h1>
+                <p>{submittedRouteMeta.successBody}</p>
+                {submittedRouteMeta.successNote ? (
+                  <p className="success-note">{submittedRouteMeta.successNote}</p>
+                ) : null}
+              </div>
+
+              <div className="success-divider" aria-hidden="true" />
+
+              <section className="success-flow-card" aria-label="流程说明">
+                <span className="success-flow-label">流程说明</span>
+                <p>{successFlowBody}</p>
+              </section>
+
+              <div className="success-scene" aria-hidden="true">
+                <div className="success-scene-surface" />
+                <div className="success-scene-shadow success-scene-shadow-primary" />
+                <div className="success-scene-shadow success-scene-shadow-secondary" />
+                <div className="success-scene-step success-scene-step-top" />
+                <div className="success-scene-step success-scene-step-middle" />
+                <div className="success-scene-step success-scene-step-bottom" />
+              </div>
+
+              <button
+                className="link-button success-link-button"
+                onClick={() => openDiscussion({ fromSuccess: true })}
+              >
+                <span>查看公开问题</span>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                >
+                  <path d="M7 17 17 7" />
+                  <path d="M8 7h9v9" />
+                </svg>
+              </button>
             </div>
+
+            <footer className="action-footer success-footer">
+              <div className="page-button-stack success-actions">
+                <button
+                  className="primary-button"
+                  onClick={resetForm}
+                >
+                  继续提问
+                </button>
+              </div>
+            </footer>
           </section>
         ) : (
           <>
@@ -716,15 +800,10 @@ export default function App() {
             </div>
             <p className="sheet-kicker">提交确认</p>
             <h2>确认提交？</h2>
-            <p className="sheet-body">{activeRouteMeta.confirmBody}</p>
             <div className="summary-card sheet-summary-card">
               <span className="summary-label">处理方式</span>
               <strong>{activeRouteMeta.title}</strong>
-              <p className="summary-note">{activeRouteMeta.description}</p>
             </div>
-            {activeRouteMeta.confirmNote ? (
-              <p className="sheet-note">{activeRouteMeta.confirmNote}</p>
-            ) : null}
             {errorMessage ? <p className="submit-error sheet-error">{errorMessage}</p> : null}
             <div className="sheet-actions">
               <button

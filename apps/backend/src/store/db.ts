@@ -4,6 +4,7 @@ import { config } from '../config.js';
 const QUESTIONS_TABLE_TOKEN = '{{questions}}';
 const SETTINGS_TABLE_TOKEN = '{{settings}}';
 const ADMIN_AUDIT_LOGS_TABLE_TOKEN = '{{admin_audit_logs}}';
+const QUESTION_CARE_SESSIONS_TABLE_TOKEN = '{{question_care_sessions}}';
 
 const pool = new Pool({
   host: config.database.host,
@@ -36,11 +37,18 @@ function getQualifiedAdminAuditLogsTable(): string {
   )}`;
 }
 
+function getQualifiedQuestionCareSessionsTable(): string {
+  return `${escapeIdentifier(config.database.schema)}.${escapeIdentifier(
+    `${config.database.tablePrefix}question_care_sessions`,
+  )}`;
+}
+
 function compileSql(sql: string): string {
   return sql
     .replaceAll(QUESTIONS_TABLE_TOKEN, getQualifiedQuestionsTable())
     .replaceAll(SETTINGS_TABLE_TOKEN, getQualifiedSettingsTable())
-    .replaceAll(ADMIN_AUDIT_LOGS_TABLE_TOKEN, getQualifiedAdminAuditLogsTable());
+    .replaceAll(ADMIN_AUDIT_LOGS_TABLE_TOKEN, getQualifiedAdminAuditLogsTable())
+    .replaceAll(QUESTION_CARE_SESSIONS_TABLE_TOKEN, getQualifiedQuestionCareSessionsTable());
 }
 
 type Queryable = Pool | PoolClient;
@@ -63,6 +71,7 @@ export async function initializeDatabase(): Promise<void> {
   const table = getQualifiedQuestionsTable();
   const settingsTable = getQualifiedSettingsTable();
   const adminAuditLogsTable = getQualifiedAdminAuditLogsTable();
+  const questionCareSessionsTable = getQualifiedQuestionCareSessionsTable();
 
   await pool.query(`create schema if not exists ${schema}`);
   await pool.query(`
@@ -105,6 +114,21 @@ export async function initializeDatabase(): Promise<void> {
       `${config.database.tablePrefix}questions_display_status_idx`,
     )}
     on ${table} (display_status)
+  `);
+  await pool.query(`
+    create table if not exists ${questionCareSessionsTable} (
+      question_id uuid not null references ${table} (id) on delete cascade,
+      session_hash varchar(64) not null,
+      expires_at timestamptz not null,
+      created_at timestamptz not null default now(),
+      primary key (question_id, session_hash)
+    )
+  `);
+  await pool.query(`
+    create index if not exists ${escapeIdentifier(
+      `${config.database.tablePrefix}question_care_sessions_expires_at_idx`,
+    )}
+    on ${questionCareSessionsTable} (expires_at)
   `);
   await pool.query(`
     create table if not exists ${settingsTable} (

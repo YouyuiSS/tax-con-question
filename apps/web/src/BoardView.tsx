@@ -9,7 +9,7 @@ import {
 } from 'motion/react';
 import { Check, Globe, Grid2X2, Sparkles, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { adminFetch } from './lib/adminAuth';
+import { adminFetch, getStoredAdminToken } from './lib/adminAuth';
 import { cn } from './lib/utils';
 
 type QuestionRoute = 'public_discuss' | 'meeting_only';
@@ -40,21 +40,16 @@ type Question = {
   createdAt: string;
 };
 
-type QuestionEvent =
-  | { type: 'question.created'; payload: Question }
-  | { type: 'question.updated'; payload: Question }
-  | { type: 'question.deleted'; payload: { id: string } };
-
 const HIGHLIGHT_DURATION_MS = 2600;
 const ALL_TAGS = '全部';
-
-const ROUTE_LABEL: Record<QuestionRoute, string> = {
-  public_discuss: '公开问题',
-  meeting_only: '会上公开',
-};
+const BOARD_POLL_INTERVAL_MS = 10000;
 
 function isVisibleOnBoard(question: Question): boolean {
   return question.displayStatus !== 'archived';
+}
+
+function getQuestionTagLabel(question: Pick<Question, 'tag'>): string {
+  return question.tag.trim() || '未分类';
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -140,14 +135,6 @@ function formatQuestionTime(value: string, nowTimestamp: number): string {
   return `${diffDays}天前`;
 }
 
-function parseQuestionEvent(raw: string): QuestionEvent | null {
-  try {
-    return JSON.parse(raw) as QuestionEvent;
-  } catch (_error) {
-    return null;
-  }
-}
-
 function isAnswered(question: Pick<Question, 'answerStatus'>): boolean {
   return question.answerStatus !== 'unanswered';
 }
@@ -180,6 +167,7 @@ function QuestionCard({
   const rotateX = useTransform(y, [-300, 300], [8, -8]);
   const rotateY = useTransform(x, [-300, 300], [-8, 8]);
   const count = q.count ?? 1;
+  const tagLabel = getQuestionTagLabel(q);
 
   function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
     if (viewMode === 'globe') {
@@ -238,7 +226,7 @@ function QuestionCard({
       <div className="relative z-10">
         <div className="mb-5 flex flex-wrap items-center gap-2 text-sm">
           <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-cyan-100/90">
-            {ROUTE_LABEL[q.route]}
+            {tagLabel}
           </span>
         </div>
 
@@ -267,7 +255,7 @@ function FocusedQuestionOverlay({
   markingAnswered?: boolean;
 }) {
   const count = question.count ?? 1;
-  const tag = question.tag.trim() || '未分类';
+  const tag = getQuestionTagLabel(question);
 
   return (
     <motion.div
@@ -295,9 +283,6 @@ function FocusedQuestionOverlay({
         <div className="relative z-10 flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-full border border-white/14 bg-white/8 px-4 py-2 text-white/78">
             {tag}
-          </span>
-          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-cyan-100">
-            {ROUTE_LABEL[question.route]}
           </span>
         </div>
 
@@ -528,6 +513,59 @@ export function BoardView({
     }
   }
 
+  function syncBoardSnapshot(items: Question[], mode: 'initial' | 'refresh') {
+    replaceQuestionSnapshots(items);
+    const visibleItems = items.filter(isVisibleOnBoard);
+
+    if (mode === 'initial') {
+      setQuestions(visibleItems);
+      setIncomingQueue([]);
+      setHighlightedQuestion(null);
+      setLoadingState('ready');
+      setConnectionState('live');
+      setErrorMessage('');
+      return;
+    }
+
+    const visibleById = new Map(visibleItems.map((item) => [item.id, item]));
+    const knownIds = new Set<string>([
+      ...questionsRef.current.map((item) => item.id),
+      ...incomingQueueRef.current.map((item) => item.id),
+      ...(highlightedQuestionRef.current ? [highlightedQuestionRef.current.id] : []),
+    ]);
+    const newItems = visibleItems.filter((item) => !knownIds.has(item.id));
+
+    setQuestions((previous) =>
+      previous
+        .filter((item) => visibleById.has(item.id))
+        .map((item) => visibleById.get(item.id) ?? item),
+    );
+    setIncomingQueue((previous) => {
+      const syncedQueue = previous
+        .filter((item) => visibleById.has(item.id))
+        .map((item) => visibleById.get(item.id) ?? item);
+      const existingIds = new Set(syncedQueue.map((item) => item.id));
+
+      newItems.forEach((item) => {
+        if (!existingIds.has(item.id)) {
+          syncedQueue.push(item);
+          existingIds.add(item.id);
+        }
+      });
+
+      return syncedQueue;
+    });
+    setHighlightedQuestion((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return visibleById.get(current.id) ?? null;
+    });
+    setConnectionState('live');
+    setErrorMessage('');
+  }
+
   useEffect(() => {
     if (viewMode !== 'globe') {
       return;
@@ -567,136 +605,45 @@ export function BoardView({
   useEffect(() => {
     let isCancelled = false;
 
-    async function loadQuestions() {
+    async function loadQuestions(mode: 'initial' | 'refresh') {
+      if (mode === 'refresh' && !getStoredAdminToken()) {
+        return;
+      }
+
       try {
-        const response = await fetch('/api/questions/board');
+        const response = await adminFetch('/api/questions/board');
+        const data = (await response.json().catch(() => null)) as {
+          items?: Question[];
+          message?: string;
+        } | null;
 
         if (!response.ok) {
-          throw new Error('大屏数据加载失败。');
+          throw new Error(data?.message ?? '大屏数据加载失败。');
         }
 
-        const data = (await response.json()) as { items: Question[] };
-
-        if (!isCancelled) {
-          replaceQuestionSnapshots(data.items);
-          setQuestions(data.items.filter(isVisibleOnBoard));
-          setLoadingState('ready');
-          setErrorMessage('');
+        if (!isCancelled && Array.isArray(data?.items)) {
+          syncBoardSnapshot(data.items, mode);
         }
       } catch (error) {
         if (!isCancelled) {
-          setLoadingState('error');
+          setConnectionState('error');
           setErrorMessage(error instanceof Error ? error.message : '大屏数据加载失败。');
+
+          if (mode === 'initial') {
+            setLoadingState('error');
+          }
         }
       }
     }
 
-    void loadQuestions();
+    void loadQuestions('initial');
+    const timer = window.setInterval(() => {
+      void loadQuestions('refresh');
+    }, BOARD_POLL_INTERVAL_MS);
 
     return () => {
       isCancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const eventSource = new EventSource('/api/events/board');
-
-    eventSource.addEventListener('connected', () => {
-      setConnectionState('live');
-    });
-
-    eventSource.addEventListener('ping', () => {
-      setConnectionState('live');
-    });
-
-    eventSource.addEventListener('question.created', (event) => {
-      const parsed = parseQuestionEvent((event as MessageEvent<string>).data);
-
-      if (!parsed || parsed.type !== 'question.created') {
-        return;
-      }
-
-      upsertQuestionSnapshot(parsed.payload);
-
-      if (!isVisibleOnBoard(parsed.payload)) {
-        return;
-      }
-
-      setIncomingQueue((previous) => {
-        if (previous.some((item) => item.id === parsed.payload.id)) {
-          return previous;
-        }
-
-        return [...previous, parsed.payload];
-      });
-    });
-
-    eventSource.addEventListener('question.updated', (event) => {
-      const parsed = parseQuestionEvent((event as MessageEvent<string>).data);
-
-      if (!parsed || parsed.type !== 'question.updated') {
-        return;
-      }
-
-      upsertQuestionSnapshot(parsed.payload);
-
-      if (!isVisibleOnBoard(parsed.payload)) {
-        setQuestions((previous) =>
-          previous.filter((item) => item.id !== parsed.payload.id),
-        );
-        setIncomingQueue((previous) =>
-          previous.filter((item) => item.id !== parsed.payload.id),
-        );
-        setHighlightedQuestion((current) =>
-          current?.id === parsed.payload.id ? null : current,
-        );
-        return;
-      }
-
-      const existedOnBoard = questionsRef.current.some((item) => item.id === parsed.payload.id);
-      const alreadyQueued = incomingQueueRef.current.some((item) => item.id === parsed.payload.id);
-      const isHighlighted = highlightedQuestionRef.current?.id === parsed.payload.id;
-
-      if (!existedOnBoard && !alreadyQueued && !isHighlighted) {
-        setIncomingQueue((previous) => [...previous, parsed.payload]);
-        return;
-      }
-
-      setQuestions((previous) => upsertQuestion(previous, parsed.payload));
-      setIncomingQueue((previous) =>
-        previous.map((item) => (item.id === parsed.payload.id ? parsed.payload : item)),
-      );
-      setHighlightedQuestion((current) =>
-        current?.id === parsed.payload.id ? parsed.payload : current,
-      );
-    });
-
-    eventSource.addEventListener('question.deleted', (event) => {
-      const parsed = parseQuestionEvent((event as MessageEvent<string>).data);
-
-      if (!parsed || parsed.type !== 'question.deleted') {
-        return;
-      }
-
-      removeQuestionSnapshot(parsed.payload.id);
-
-      setQuestions((previous) =>
-        previous.filter((item) => item.id !== parsed.payload.id),
-      );
-      setIncomingQueue((previous) =>
-        previous.filter((item) => item.id !== parsed.payload.id),
-      );
-      setHighlightedQuestion((current) =>
-        current?.id === parsed.payload.id ? null : current,
-      );
-    });
-
-    eventSource.onerror = () => {
-      setConnectionState('error');
-    };
-
-    return () => {
-      eventSource.close();
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -862,7 +809,9 @@ export function BoardView({
 
       const updated = (await response.json()) as Question;
 
+      upsertQuestionSnapshot(updated);
       if (!isVisibleOnBoard(updated)) {
+        removeQuestionSnapshot(questionId);
         setQuestions((previous) => previous.filter((item) => item.id !== questionId));
       } else {
         setQuestions((previous) => upsertQuestion(previous, updated));
@@ -1120,10 +1069,10 @@ export function BoardView({
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.92, opacity: 0, filter: 'blur(20px)' }}
               transition={{ type: 'spring', stiffness: 180, damping: 22 }}
-              className="glass-card relative w-[92vw] max-w-5xl overflow-hidden rounded-[3rem] border border-cyan-300/25 p-14 text-center shadow-[0_0_90px_rgba(34,211,238,0.15)]"
+              className="glass-card relative w-[92vw] max-w-5xl overflow-hidden rounded-[3rem] border border-cyan-300/25 p-14 text-left shadow-[0_0_90px_rgba(34,211,238,0.15)]"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/8 via-transparent to-blue-500/8" />
-              <div className="relative z-10 mx-auto mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+              <div className="relative z-10 mb-7 inline-flex w-fit items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
                 <Sparkles className="h-4 w-4" />
                 新问题进入现场
               </div>
@@ -1132,9 +1081,9 @@ export function BoardView({
                 “{highlightedQuestion.text}”
               </h2>
 
-              <div className="relative z-10 flex items-center justify-center gap-3 text-sm text-white/80">
+              <div className="relative z-10 flex items-center justify-start gap-3 text-sm text-white/80">
                 <span className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-4 py-2">
-                  {ROUTE_LABEL[highlightedQuestion.route]}
+                  {getQuestionTagLabel(highlightedQuestion)}
                 </span>
               </div>
             </motion.section>
