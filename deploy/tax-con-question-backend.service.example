@@ -7,11 +7,11 @@ Type=simple
 WorkingDirectory=/srv/tax-con-question/current/backend
 Environment=NODE_ENV=production
 EnvironmentFile=/srv/tax-con-question/shared/backend.env
-ExecStart=/usr/bin/env node dist/server.js
+ExecStart=/usr/local/bin/node dist/server.js
 Restart=always
 RestartSec=5
-User=www-data
-Group=www-data
+User=nginx
+Group=nginx
 
 [Install]
 WantedBy=multi-user.target

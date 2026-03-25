@@ -62,11 +62,12 @@ npm run deploy:ecs
 
 ### First-Time Setup
 
-1. Copy `deploy/deploy.env.example` to `deploy/deploy.env` and fill in your ECS SSH info.
-2. Put your backend env file on the server at `/srv/tax-con-question/shared/backend.env`, or change `BACKEND_ENV_PATH` in `deploy/deploy.env`.
-3. Create a backend service on ECS using `deploy/tax-con-question-backend.service.example`.
-4. Configure Nginx using `deploy/nginx.tax-con-question.conf.example`.
+1. Copy `deploy/deploy.env.example` to `deploy/deploy.env` and fill in your ECS SSH info. `deploy/deploy.env` is ignored by Git, so your real deploy settings stay local.
+2. For Alibaba Cloud Linux 3, run `deploy/bootstrap-ecs-alinux3.sh.example` on the server once to install Node.js, Nginx, systemd, and the deploy directories.
+3. Put your backend env file on the server at `/srv/tax-con-question/shared/backend.env`, or change `BACKEND_ENV_PATH` in `deploy/deploy.env`.
+4. If you prefer manual server setup, use `deploy/tax-con-question-backend.service.example` and `deploy/nginx.tax-con-question.conf.example` as templates.
 5. Set `DEPLOY_RESTART_COMMAND` and `DEPLOY_POST_DEPLOY_COMMAND` in `deploy/deploy.env` if you want the deploy to restart `systemd` and reload Nginx automatically.
+6. If you want a non-default management route for the `web` app, set `VITE_MANAGEMENT_PATH` in an ignored local file such as `apps/web/.env.production.local`.
 
 ### What The Deploy Script Does
 

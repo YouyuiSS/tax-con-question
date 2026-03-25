@@ -116,7 +116,7 @@ ssh "${SSH_OPTIONS[@]}" "${REMOTE_TARGET}" "mkdir -p '${REMOTE_INCOMING_DIR}' '$
 scp "${SCP_OPTIONS[@]}" "${ARCHIVE_PATH}" "${REMOTE_ENV_FILE}" "${REMOTE_TARGET}:${REMOTE_INCOMING_DIR}/"
 
 echo "Activating release on ECS..."
-ssh "${SSH_OPTIONS[@]}" "${REMOTE_TARGET}" "set -Eeuo pipefail; source '${REMOTE_ENV_PATH}'; rm -f '${REMOTE_ENV_PATH}'; bash -s" < "${ROOT_DIR}/scripts/remote-release.sh"
+ssh "${SSH_OPTIONS[@]}" "${REMOTE_TARGET}" "set -Eeuo pipefail; set -a; source '${REMOTE_ENV_PATH}'; set +a; rm -f '${REMOTE_ENV_PATH}'; bash -s" < "${ROOT_DIR}/scripts/remote-release.sh"
 
 echo "Deployment finished."
 echo "Release ID: ${RELEASE_ID}"

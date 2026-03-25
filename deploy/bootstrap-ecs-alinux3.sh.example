@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+APP_NAME="tax-con-question"
+APP_DIR="/srv/${APP_NAME}"
+SERVICE_NAME="${APP_NAME}-backend"
+NODE_VERSION="${NODE_VERSION:-24.14.1}"
+
+ARCH="$(uname -m)"
+case "${ARCH}" in
+  x86_64)
+    NODE_ARCH="x64"
+    ;;
+  aarch64|arm64)
+    NODE_ARCH="arm64"
+    ;;
+  *)
+    echo "Unsupported architecture: ${ARCH}" >&2
+    exit 1
+    ;;
+esac
+
+echo "Updating system packages..."
+dnf update -y
+dnf install -y curl tar xz git
+
+echo "Installing Nginx from the official repository..."
+tee /etc/yum.repos.d/nginx.repo <<'EOF'
+[nginx-stable]
+name=nginx stable repo
+baseurl=https://nginx.org/packages/centos/8/$basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true
+EOF
+
+dnf install -y nginx
+systemctl enable --now nginx
+
+echo "Installing Node.js ${NODE_VERSION}..."
+mkdir -p /usr/local/lib/nodejs
+NODE_DIST="node-v${NODE_VERSION}-linux-${NODE_ARCH}"
+curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DIST}.tar.xz" -o "/tmp/${NODE_DIST}.tar.xz"
+rm -rf "/usr/local/lib/nodejs/${NODE_DIST}"
+tar -xJf "/tmp/${NODE_DIST}.tar.xz" -C /usr/local/lib/nodejs
+ln -sfn "/usr/local/lib/nodejs/${NODE_DIST}/bin/node" /usr/local/bin/node
+ln -sfn "/usr/local/lib/nodejs/${NODE_DIST}/bin/npm" /usr/local/bin/npm
+ln -sfn "/usr/local/lib/nodejs/${NODE_DIST}/bin/npx" /usr/local/bin/npx
+ln -sfn "/usr/local/lib/nodejs/${NODE_DIST}/bin/corepack" /usr/local/bin/corepack
+rm -f "/tmp/${NODE_DIST}.tar.xz"
+
+echo "Preparing deploy directories..."
+mkdir -p "${APP_DIR}/releases" "${APP_DIR}/incoming" "${APP_DIR}/shared"
+touch "${APP_DIR}/shared/backend.env"
+
+echo "Writing systemd service..."
+tee "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
+[Unit]
+Description=${APP_NAME} backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${APP_DIR}/current/backend
+Environment=NODE_ENV=production
+EnvironmentFile=${APP_DIR}/shared/backend.env
+ExecStart=/usr/local/bin/node dist/server.js
+Restart=always
+RestartSec=5
+User=nginx
+Group=nginx
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Writing Nginx config..."
+tee "/etc/nginx/conf.d/${APP_NAME}.conf" <<EOF
+server {
+    listen 80 default_server;
+    server_name _;
+
+    root ${APP_DIR}/current/web;
+    index index.html;
+
+    location /api/events {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 3600;
+        proxy_buffering off;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /h5/ {
+        root ${APP_DIR}/current;
+        try_files \$uri \$uri/ /h5/index.html;
+    }
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+
+rm -f /etc/nginx/conf.d/default.conf
+nginx -t
+systemctl daemon-reload
+systemctl enable "${SERVICE_NAME}"
+systemctl restart nginx
+
+echo
+echo "Bootstrap complete."
+echo "Node version: $(node -v)"
+echo "npm version: $(npm -v)"
+echo "Nginx version: $(nginx -v 2>&1)"
+echo
+echo "Next steps:"
+echo "1. Fill ${APP_DIR}/shared/backend.env"
+echo "2. Open ECS security-group ports 22 and 80, plus 443 if you will add HTTPS"
+echo "3. Set deploy/deploy.env on your local machine"
+echo "4. Run npm run deploy:ecs locally"

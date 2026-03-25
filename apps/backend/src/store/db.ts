@@ -2,6 +2,7 @@ import { Pool, type QueryResult, type QueryResultRow } from 'pg';
 import { config } from '../config.js';
 
 const QUESTIONS_TABLE_TOKEN = '{{questions}}';
+const SETTINGS_TABLE_TOKEN = '{{settings}}';
 
 const pool = new Pool({
   host: config.database.host,
@@ -22,13 +23,22 @@ function getQualifiedQuestionsTable(): string {
   )}`;
 }
 
+function getQualifiedSettingsTable(): string {
+  return `${escapeIdentifier(config.database.schema)}.${escapeIdentifier(
+    `${config.database.tablePrefix}settings`,
+  )}`;
+}
+
 function compileSql(sql: string): string {
-  return sql.replaceAll(QUESTIONS_TABLE_TOKEN, getQualifiedQuestionsTable());
+  return sql
+    .replaceAll(QUESTIONS_TABLE_TOKEN, getQualifiedQuestionsTable())
+    .replaceAll(SETTINGS_TABLE_TOKEN, getQualifiedSettingsTable());
 }
 
 export async function initializeDatabase(): Promise<void> {
   const schema = escapeIdentifier(config.database.schema);
   const table = getQualifiedQuestionsTable();
+  const settingsTable = getQualifiedSettingsTable();
 
   await pool.query(`create schema if not exists ${schema}`);
   await pool.query(`
@@ -37,9 +47,33 @@ export async function initializeDatabase(): Promise<void> {
       text varchar(500) not null,
       tag varchar(120) not null default '',
       route varchar(32) not null check (route in ('public_discuss', 'meeting_only')),
+      display_status varchar(32) not null default 'pending'
+        check (display_status in ('pending', 'show_raw', 'count_only', 'redirect_official', 'archived')),
+      answer_status varchar(32) not null default 'unanswered'
+        check (answer_status in ('unanswered', 'answered_live', 'answered_post')),
+      submitter_key varchar(120) not null default '',
       count integer not null default 1,
-      created_at timestamptz not null default now()
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
     )
+  `);
+  await pool.query(`
+    alter table ${table}
+    add column if not exists display_status varchar(32) not null default 'pending'
+      check (display_status in ('pending', 'show_raw', 'count_only', 'redirect_official', 'archived'))
+  `);
+  await pool.query(`
+    alter table ${table}
+    add column if not exists answer_status varchar(32) not null default 'unanswered'
+      check (answer_status in ('unanswered', 'answered_live', 'answered_post'))
+  `);
+  await pool.query(`
+    alter table ${table}
+    add column if not exists submitter_key varchar(120) not null default ''
+  `);
+  await pool.query(`
+    alter table ${table}
+    add column if not exists updated_at timestamptz not null default now()
   `);
   await pool.query(`
     create index if not exists ${escapeIdentifier(
@@ -47,6 +81,32 @@ export async function initializeDatabase(): Promise<void> {
     )}
     on ${table} (created_at desc)
   `);
+  await pool.query(`
+    create index if not exists ${escapeIdentifier(
+      `${config.database.tablePrefix}questions_display_status_idx`,
+    )}
+    on ${table} (display_status)
+  `);
+  await pool.query(`
+    create index if not exists ${escapeIdentifier(
+      `${config.database.tablePrefix}questions_submitter_key_idx`,
+    )}
+    on ${table} (submitter_key)
+  `);
+  await pool.query(`
+    create table if not exists ${settingsTable} (
+      key varchar(80) primary key,
+      value_boolean boolean not null,
+      updated_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(
+    `
+      insert into ${settingsTable} (key, value_boolean)
+      values ('auto_publish_enabled', false)
+      on conflict (key) do nothing
+    `,
+  );
 }
 
 export async function query<Row extends QueryResultRow>(

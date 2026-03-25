@@ -2,6 +2,7 @@ import express from 'express';
 import { config } from './config.js';
 import { createEventsRouter } from './routes/events.js';
 import { createQuestionsRouter } from './routes/questions.js';
+import { createSettingsRouter } from './routes/settings.js';
 import { initializeDatabase } from './store/db.js';
 
 async function startServer(): Promise<void> {
@@ -12,8 +13,8 @@ async function startServer(): Promise<void> {
 
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, X-Submitter-Key');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
 
     if (req.method === 'OPTIONS') {
       res.sendStatus(204);
@@ -35,6 +36,7 @@ async function startServer(): Promise<void> {
   });
 
   app.use('/api/questions', createQuestionsRouter());
+  app.use('/api/settings', createSettingsRouter());
   app.use('/api/events', createEventsRouter());
 
   app.listen(config.port, () => {
