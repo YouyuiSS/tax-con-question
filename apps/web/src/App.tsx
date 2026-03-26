@@ -11,8 +11,10 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import {
   BadgeCheck,
+  Check,
   Clock3,
   Filter,
+  FolderArchive,
   MessageSquareText,
   RefreshCcw,
   Search,
@@ -831,79 +833,132 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
               ) : (
                 <div className="overflow-x-auto">
                   <div className="min-w-[960px] px-4 pb-4 md:px-6">
-                    <div className="mt-4 grid grid-cols-[110px_120px_minmax(0,2.2fr)_150px_140px] gap-3 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/38">
-                      <span>ID</span>
+                    <div className="mt-4 grid grid-cols-[120px_minmax(0,2.3fr)_150px_220px] gap-3 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/38">
                       <span>处理方式</span>
                       <span>原始问题</span>
                       <span>答复状态</span>
-                      <span>提交时间</span>
+                      <span>操作</span>
                     </div>
 
                     <div className="mt-3 space-y-2">
                       {filteredQuestions.map((question) => {
                         const isSelected = question.id === selectedQuestionId;
+                        const answerActionKey = `quick_answer:${question.id}`;
+                        const archiveActionKey = `quick_archive:${question.id}`;
+                        const isBusy = !!savingKey;
+                        const isArchived = isArchivedStatus(question.displayStatus);
+                        const showQuickAnswer = !isArchived && question.answerStatus !== 'answered_live';
+                        const showQuickArchive = !isArchived;
 
                         return (
-                          <button
+                          <div
                             key={question.id}
-                            type="button"
-                            onClick={() => setSelectedQuestionId(question.id)}
                             className={cn(
-                              'grid w-full grid-cols-[110px_120px_minmax(0,2.2fr)_150px_140px] gap-3 rounded-[1.5rem] border px-3 py-3 text-left transition',
+                              'grid w-full grid-cols-[120px_minmax(0,2.3fr)_150px_220px] gap-3 rounded-[1.5rem] border px-3 py-3 text-left transition',
                               isSelected
                                 ? 'border-cyan-300/28 bg-cyan-300/10 shadow-[0_16px_45px_rgba(6,182,212,0.14)]'
                                 : 'border-white/8 bg-white/4 hover:border-white/15 hover:bg-white/6',
                             )}
                           >
-                            <div className="space-y-2">
-                              <p className="font-mono text-sm font-semibold text-white/88">
-                                {shortQuestionId(question.id)}
-                              </p>
-                              <p className="text-xs text-white/38">关心人数 {question.count ?? 1}</p>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedQuestionId(question.id)}
+                              className="contents text-left"
+                            >
+                              <div className="pt-0.5">
+                                <StatusBadge tone={ROUTE_BADGE_STYLES[question.route]}>
+                                  {ROUTE_LABEL[question.route]}
+                                </StatusBadge>
+                              </div>
 
-                            <div className="pt-0.5">
-                              <StatusBadge tone={ROUTE_BADGE_STYLES[question.route]}>
-                                {ROUTE_LABEL[question.route]}
-                              </StatusBadge>
-                            </div>
+                              <div className="space-y-2">
+                                <p className="truncate text-sm leading-7 text-white/88">
+                                  {question.text}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <span
+                                    className={cn(
+                                      'inline-flex items-center rounded-full border px-2.5 py-1',
+                                      question.tag.trim()
+                                        ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100/88'
+                                        : 'border-white/10 bg-white/6 text-white/45',
+                                    )}
+                                  >
+                                    {question.tag.trim() || '未分类'}
+                                  </span>
+                                  {isArchived ? (
+                                    <StatusBadge tone={ARCHIVED_BADGE_TONE}>
+                                      已归档
+                                    </StatusBadge>
+                                  ) : null}
+                                  <span className="text-white/42">
+                                    关心人数 {question.count ?? 1}
+                                  </span>
+                                  <span className="text-white/42">
+                                    提交时间 {formatDateTime(question.createdAt)}
+                                  </span>
+                                </div>
+                              </div>
 
-                            <div className="space-y-2">
-                              <p className="truncate text-sm leading-7 text-white/88">
-                                {question.text}
-                              </p>
-                              <div className="flex flex-wrap items-center gap-2 text-xs">
-                                <span
+                              <div className="pt-0.5">
+                                <StatusBadge tone={ANSWER_STATUS_BADGE_STYLES[question.answerStatus]}>
+                                  {ANSWER_STATUS_LABEL[question.answerStatus]}
+                                </StatusBadge>
+                              </div>
+                            </button>
+
+                            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                              {showQuickAnswer ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void updateQuestion(
+                                      question.id,
+                                      { answerStatus: 'answered_live' },
+                                      'quick_answer',
+                                      '已标记为现场回答。',
+                                    )
+                                  }
+                                  disabled={isBusy}
                                   className={cn(
-                                    'inline-flex items-center rounded-full border px-2.5 py-1',
-                                    question.tag.trim()
-                                      ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100/88'
-                                      : 'border-white/10 bg-white/6 text-white/45',
+                                    'inline-flex items-center justify-center gap-2 rounded-full border px-3.5 py-2 text-xs font-semibold tracking-[0.02em] transition',
+                                    savingKey === answerActionKey
+                                      ? 'border-emerald-300/28 bg-emerald-300/14 text-emerald-100'
+                                      : 'border-emerald-300/18 bg-emerald-300/8 text-emerald-50/88 hover:border-emerald-300/30 hover:bg-emerald-300/14',
+                                    isBusy && 'cursor-not-allowed opacity-60',
                                   )}
                                 >
-                                  {question.tag.trim() || '未分类'}
-                                </span>
-                                {isArchivedStatus(question.displayStatus) ? (
-                                  <StatusBadge tone={ARCHIVED_BADGE_TONE}>
-                                    已归档
-                                  </StatusBadge>
-                                ) : null}
-                                <span className="text-white/42">
-                                  更新时间 {formatDateTime(question.updatedAt)}
-                                </span>
-                              </div>
-                            </div>
+                                  <Check className="h-3.5 w-3.5" />
+                                  {savingKey === answerActionKey ? '处理中...' : '已现场回答'}
+                                </button>
+                              ) : null}
 
-                            <div className="pt-0.5">
-                              <StatusBadge tone={ANSWER_STATUS_BADGE_STYLES[question.answerStatus]}>
-                                {ANSWER_STATUS_LABEL[question.answerStatus]}
-                              </StatusBadge>
+                              {showQuickArchive ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void updateQuestion(
+                                      question.id,
+                                      { displayStatus: 'archived' },
+                                      'quick_archive',
+                                      '问题已归档。',
+                                    )
+                                  }
+                                  disabled={isBusy}
+                                  className={cn(
+                                    'inline-flex items-center justify-center gap-2 rounded-full border px-3.5 py-2 text-xs font-semibold tracking-[0.02em] transition',
+                                    savingKey === archiveActionKey
+                                      ? 'border-white/18 bg-white/10 text-white'
+                                      : 'border-white/12 bg-black/18 text-white/75 hover:border-white/20 hover:bg-white/8 hover:text-white/90',
+                                    isBusy && 'cursor-not-allowed opacity-60',
+                                  )}
+                                >
+                                  <FolderArchive className="h-3.5 w-3.5" />
+                                  {savingKey === archiveActionKey ? '归档中...' : '归档'}
+                                </button>
+                              ) : null}
                             </div>
-
-                            <div className="pt-1 text-sm text-white/64">
-                              {formatDateTime(question.createdAt)}
-                            </div>
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
