@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import sunlightImage from '../assets/sunlight01.png';
 
 type QuestionRoute = 'meeting_only' | 'public_discuss';
 type AppScreen = 'ask' | 'discussion';
@@ -445,11 +446,11 @@ export default function App() {
               <h1 className="discussion-title">公开问题</h1>
             </header>
 
-              <section className="discussion-search-section">
-                <input
-                  className="search-input"
-                  placeholder="搜索公开问题"
-                  value={searchTerm}
+            <section className="discussion-search-section">
+              <input
+                className="search-input"
+                placeholder="搜索公开问题"
+                value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </section>
@@ -642,12 +643,7 @@ export default function App() {
               </section>
 
               <div className="success-scene" aria-hidden="true">
-                <div className="success-scene-surface" />
-                <div className="success-scene-shadow success-scene-shadow-primary" />
-                <div className="success-scene-shadow success-scene-shadow-secondary" />
-                <div className="success-scene-step success-scene-step-top" />
-                <div className="success-scene-step success-scene-step-middle" />
-                <div className="success-scene-step success-scene-step-bottom" />
+                <img className="success-scene-image" src={sunlightImage} alt="" />
               </div>
 
               <button
@@ -684,7 +680,7 @@ export default function App() {
         ) : (
           <>
             <header className="page-header">
-              <h1>税务心声</h1>
+              <h1>税务产品心声广场</h1>
               <p className="subtitle">写下你希望在大会上被回应的问题，请避免填写可识别个人信息。</p>
             </header>
 
@@ -701,7 +697,7 @@ export default function App() {
               <textarea
                 id="question-input"
                 className="question-input"
-                placeholder="例如：今年晋升标准会调整吗？"
+                placeholder="例如：今年新成立了法律评审产品，也有一些人员调整。我们人员调整的策略和考量因素是什么？"
                 maxLength={MAX_LENGTH}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
