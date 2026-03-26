@@ -196,18 +196,18 @@ export async function incrementQuestionCountById(
         where id = $1
         for update
       ),
-      removed_session as (
-        delete from {{question_care_sessions}}
+      existing_active_session as (
+        select question_id
+        from {{question_care_sessions}}
         where question_id = $1
           and session_hash = $2
           and expires_at > now()
-        returning question_id
       ),
       inserted_session as (
         insert into {{question_care_sessions}} (question_id, session_hash, expires_at)
         select id, $2, $3
         from target_question
-        where not exists (select 1 from removed_session)
+        where not exists (select 1 from existing_active_session)
         on conflict (question_id, session_hash) do update
         set expires_at = excluded.expires_at
         where {{question_care_sessions}}.expires_at <= now()
@@ -217,11 +217,10 @@ export async function incrementQuestionCountById(
         update {{questions}}
         set count = case
           when exists (select 1 from inserted_session) then count + 1
-          when exists (select 1 from removed_session) then greatest(1, count - 1)
           else count
         end,
         updated_at = case
-          when exists (select 1 from inserted_session) or exists (select 1 from removed_session)
+          when exists (select 1 from inserted_session)
             then now()
           else updated_at
         end
@@ -239,8 +238,11 @@ export async function incrementQuestionCountById(
         count,
         created_at,
         updated_at,
-        exists(select 1 from inserted_session) as cared,
-        (exists(select 1 from inserted_session) or exists(select 1 from removed_session)) as changed
+        (
+          exists(select 1 from existing_active_session)
+          or exists(select 1 from inserted_session)
+        ) as cared,
+        exists(select 1 from inserted_session) as changed
       from updated_question
     `,
     [id, sessionHash, expiresAt],

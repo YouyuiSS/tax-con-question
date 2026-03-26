@@ -220,6 +220,13 @@ input {
   box-shadow: none;
 }
 
+.secondary-button:disabled,
+.back-button:disabled,
+.link-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .secondary-button {
   background: rgba(232, 236, 231, 0.95);
   color: #42535d;

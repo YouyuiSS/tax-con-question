@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 type QuestionRoute = 'meeting_only' | 'public_discuss';
 type AppScreen = 'ask' | 'discussion';
 type DiscussionSort = 'date' | 'count';
-type DisplayStatus = 'pending' | 'show_raw' | 'count_only' | 'redirect_official' | 'archived';
 
 type SubmissionState = 'form' | 'confirm' | 'success';
 
@@ -17,10 +16,6 @@ type PublicQuestion = {
   caredBySession: boolean;
 };
 
-type AppSettings = {
-  autoPublishEnabled: boolean;
-};
-
 type RouteMeta = {
   title: string;
   description: string;
@@ -30,28 +25,32 @@ type RouteMeta = {
   successNote?: string;
 };
 
-const BASE_ROUTE_META: Record<QuestionRoute, RouteMeta> = {
+type CreatedQuestionResponse = {
+  id: string;
+  route: QuestionRoute;
+};
+
+const ROUTE_META: Record<QuestionRoute, RouteMeta> = {
   meeting_only: {
     title: '会上公开',
-    description: '会前不公开，会上统一回应。',
-    confirmBody: '你的问题会在会上统一回应。',
-    confirmNote: '会前不公开。',
-    successBody: '你的问题已收到，会在会上统一回应。',
+    description: '提交后会进入大会展示流程，会前不会进入公开问题池。',
+    confirmBody: '你的问题提交后会进入大会展示流程，会前不会进入公开问题池。',
+    confirmNote: '会前不会进入公开问题池。',
+    successBody: '你的问题已收到，已进入大会展示流程。',
     successNote: '会前不公开。',
   },
   public_discuss: {
     title: '公开问题',
-    description: '提交后进入公开池，其他同事可以看到。',
-    confirmBody: '你的问题提交后会进入公开池，其他同事可以看到。',
-    successBody: '你的问题已收到，已进入公开池。',
+    description: '提交后会直接进入公开问题池，其他同事可以看到。',
+    confirmBody: '你的问题提交后会直接进入公开问题池，其他同事可以看到。',
+    confirmNote: '发布后其他同事可以查看。',
+    successBody: '你的问题已收到，已直接进入公开问题池。',
+    successNote: '发布后其他同事可以查看。',
   },
 };
 
 const ROUTE_ORDER: QuestionRoute[] = ['public_discuss', 'meeting_only'];
 const DEFAULT_ROUTE: QuestionRoute = 'public_discuss';
-const DEFAULT_SETTINGS: AppSettings = {
-  autoPublishEnabled: false,
-};
 
 const MIN_LENGTH = 10;
 const MAX_LENGTH = 500;
@@ -116,48 +115,20 @@ function compareIsoDateDesc(left: string, right: string): number {
   return right.localeCompare(left);
 }
 
-function getRouteMeta(route: QuestionRoute, autoPublishEnabled: boolean): RouteMeta {
-  const base = BASE_ROUTE_META[route];
-
-  if (!autoPublishEnabled) {
-    return base;
-  }
-
-  if (route === 'public_discuss') {
-    return {
-      title: base.title,
-      description: '提交后会直接进入公开问题池。',
-      confirmBody: '你的问题提交后会直接进入公开问题池。',
-      confirmNote: '本次不经过人工处理。',
-      successBody: '你的问题已收到，已直接进入公开问题池。',
-      successNote: '本次为自动直出。',
-    };
-  }
-
-  return {
-    title: base.title,
-    description: '提交后会在大会期间展示，会前不会进入公开问题池。',
-    confirmBody: '你的问题提交后会直接进入大会展示流程，会前不会进入公开问题池。',
-    confirmNote: '本次不经过人工处理。',
-    successBody: '你的问题已收到，已进入大会展示流程。',
-    successNote: '会前不会进入公开问题池。',
-  };
+function isQuestionRoute(value: unknown): value is QuestionRoute {
+  return value === 'meeting_only' || value === 'public_discuss';
 }
 
-function getSuccessFlowBody(route: QuestionRoute, autoPublishEnabled: boolean): string {
-  if (autoPublishEnabled) {
-    if (route === 'meeting_only') {
-      return '问题已直接进入大会展示流程，会前不会出现在公开池。';
-    }
+function getRouteMeta(route: QuestionRoute): RouteMeta {
+  return ROUTE_META[route];
+}
 
-    return '问题已直接进入公开池和大会展示流程，现场会继续按当前节奏处理。';
-  }
-
+function getSuccessFlowBody(route: QuestionRoute): string {
   if (route === 'meeting_only') {
-    return '提交后会进入大会展示流程，会前不会进入公开池。';
+    return '问题会进入大会展示流程，会前不会出现在公开问题池。';
   }
 
-  return '提交后会进入公开池，其他同事可以继续查看并表达关心。';
+  return '问题已进入公开问题池，其他同事现在就可以查看。';
 }
 
 export default function App() {
@@ -168,7 +139,6 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [submittedRoute, setSubmittedRoute] = useState<QuestionRoute>(DEFAULT_ROUTE);
-  const [submittedAutoPublish, setSubmittedAutoPublish] = useState(false);
   const [publicQuestions, setPublicQuestions] = useState<PublicQuestion[]>([]);
   const [isPublicLoading, setIsPublicLoading] = useState(false);
   const [publicErrorMessage, setPublicErrorMessage] = useState('');
@@ -180,18 +150,17 @@ export default function App() {
   const [caringQuestionId, setCaringQuestionId] = useState('');
   const [recentlyCaredQuestionId, setRecentlyCaredQuestionId] = useState('');
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
-  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const activeRouteMeta = useMemo(
-    () => getRouteMeta(route, appSettings.autoPublishEnabled),
-    [appSettings.autoPublishEnabled, route],
+    () => getRouteMeta(route),
+    [route],
   );
   const submittedRouteMeta = useMemo(
-    () => getRouteMeta(submittedRoute, submittedAutoPublish),
-    [submittedAutoPublish, submittedRoute],
+    () => getRouteMeta(submittedRoute),
+    [submittedRoute],
   );
   const successFlowBody = useMemo(
-    () => getSuccessFlowBody(submittedRoute, submittedAutoPublish),
-    [submittedAutoPublish, submittedRoute],
+    () => getSuccessFlowBody(submittedRoute),
+    [submittedRoute],
   );
 
   const validationMessage = useMemo(() => getValidationMessage(text), [text]);
@@ -245,36 +214,6 @@ export default function App() {
       visibleQuestions: nextVisibleQuestions,
     };
   }, [discussionSort, publicQuestions, searchTerm, selectedTopic]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadSettings(): Promise<void> {
-      try {
-        const response = await fetch('/api/settings', {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as Partial<AppSettings>;
-
-        if (typeof data.autoPublishEnabled === 'boolean') {
-          setAppSettings({ autoPublishEnabled: data.autoPublishEnabled });
-        }
-      } catch (_error) {
-        // Keep default behavior when settings cannot be loaded.
-      }
-    }
-
-    void loadSettings();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
 
   useEffect(() => {
     if (discussionTopics.length === 0 && selectedTopic !== ALL_TOPICS) {
@@ -354,7 +293,7 @@ export default function App() {
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [appSettings.autoPublishEnabled, screen, discussionReloadKey]);
+  }, [screen, discussionReloadKey]);
 
   async function submitQuestion(): Promise<void> {
     setIsSubmitting(true);
@@ -375,17 +314,16 @@ export default function App() {
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as {
+      const data = (await response.json().catch(() => null)) as ({
+        route?: string;
         message?: string;
-        displayStatus?: DisplayStatus;
-      } | null;
+      } & Partial<CreatedQuestionResponse>) | null;
 
       if (!response.ok) {
         throw new Error(data?.message ?? '提交失败，请稍后再试。');
       }
 
-      setSubmittedRoute(route);
-      setSubmittedAutoPublish(appSettings.autoPublishEnabled);
+      setSubmittedRoute(isQuestionRoute(data?.route) ? data.route : route);
       setSubmissionState('success');
       setText('');
       setRoute(DEFAULT_ROUTE);
@@ -429,8 +367,19 @@ export default function App() {
     setScreen('ask');
   }
 
+  function clearDiscussionFilters(): void {
+    setSearchTerm('');
+    setSelectedTopic(ALL_TOPICS);
+  }
+
   async function careQuestion(id: string): Promise<void> {
     if (caringQuestionId) {
+      return;
+    }
+
+    const targetQuestion = publicQuestions.find((question) => question.id === id);
+
+    if (targetQuestion?.caredBySession) {
       return;
     }
 
@@ -496,11 +445,11 @@ export default function App() {
               <h1 className="discussion-title">公开问题</h1>
             </header>
 
-            <section className="discussion-search-section">
-              <input
-                className="search-input"
-                placeholder="搜索公开问题"
-                value={searchTerm}
+              <section className="discussion-search-section">
+                <input
+                  className="search-input"
+                  placeholder="搜索公开问题"
+                  value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </section>
@@ -571,8 +520,8 @@ export default function App() {
                 <h2>没有找到相关问题</h2>
                 <p>换个关键词试试，或者返回继续提问。</p>
                 <div className="page-button-stack">
-                  <button className="secondary-button" onClick={() => setSearchTerm('')}>
-                    清空搜索
+                  <button className="secondary-button" onClick={clearDiscussionFilters}>
+                    清空筛选
                   </button>
                   <button className="primary-button" onClick={closeDiscussion}>
                     去提问
@@ -603,9 +552,9 @@ export default function App() {
                           <button
                             type="button"
                             className={careButtonClass}
-                            disabled={isCaring}
+                            disabled={isCaring || isCared}
                             onClick={() => careQuestion(question.id)}
-                            aria-label={isCared ? '取消关心' : '我也关心'}
+                            aria-label={isCared ? '已关注' : '我也关心'}
                           >
                             <svg
                               className="care-icon"
@@ -753,6 +702,7 @@ export default function App() {
                 id="question-input"
                 className="question-input"
                 placeholder="例如：今年晋升标准会调整吗？"
+                maxLength={MAX_LENGTH}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
               />
@@ -768,7 +718,7 @@ export default function App() {
               <h2 className="section-title">处理方式</h2>
               <div className="route-list">
                 {ROUTE_ORDER.map((key) => {
-                  const meta = getRouteMeta(key, appSettings.autoPublishEnabled);
+                  const meta = getRouteMeta(key);
 
                   return (
                     <button
@@ -812,14 +762,18 @@ export default function App() {
 
       {submissionState === 'confirm' ? (
         <div className="modal-root" role="presentation">
-          <div className="modal-scrim" onClick={resetForm} />
-          <section className="bottom-sheet" aria-modal="true" role="dialog">
+          <div className="modal-scrim" onClick={isSubmitting ? undefined : resetForm} />
+          <section className="bottom-sheet" aria-modal="true" role="dialog" aria-busy={isSubmitting}>
             <div className="sheet-handle" />
             <div className="sheet-visual" aria-hidden="true">
               <div className="sheet-visual-ring" />
             </div>
             <p className="sheet-kicker">提交确认</p>
             <h2>确认提交？</h2>
+            <p className="sheet-body">{activeRouteMeta.confirmBody}</p>
+            {activeRouteMeta.confirmNote ? (
+              <p className="sheet-note">{activeRouteMeta.confirmNote}</p>
+            ) : null}
             <div className="summary-card sheet-summary-card">
               <span className="summary-label">处理方式</span>
               <strong>{activeRouteMeta.title}</strong>
@@ -828,12 +782,12 @@ export default function App() {
             <div className="sheet-actions">
               <button
                 className="primary-button"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !canContinue}
                 onClick={submitQuestion}
               >
                 {isSubmitting ? '提交中...' : '确认'}
               </button>
-              <button className="secondary-button" onClick={resetForm}>
+              <button className="secondary-button" onClick={resetForm} disabled={isSubmitting}>
                 返回
               </button>
             </div>
