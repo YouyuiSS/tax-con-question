@@ -1076,7 +1076,7 @@ export function BoardView({
       <header className="pointer-events-none absolute left-0 right-0 top-0 z-30 flex items-start justify-between px-8 pb-8 pt-4">
         <div>
           <h1 className="text-5xl font-black leading-[0.92] tracking-tight text-white drop-shadow-[0_0_18px_rgba(34,211,238,0.22)] xl:text-6xl">
-            问政税务
+            税务产品心声广场
           </h1>
         </div>
 
