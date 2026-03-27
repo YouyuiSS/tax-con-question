@@ -19,10 +19,10 @@ body {
   margin: 0;
   color: #f4fbf8;
   background:
-    radial-gradient(circle at top left, rgba(45, 212, 191, 0.16), transparent 32%),
-    radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 28%),
-    radial-gradient(circle at bottom, rgba(249, 115, 22, 0.09), transparent 30%),
-    linear-gradient(180deg, #071018 0%, #0b141c 46%, #081118 100%);
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 34%),
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 30%),
+    radial-gradient(circle at bottom, rgba(56, 189, 248, 0.1), transparent 32%),
+    linear-gradient(180deg, #06111f 0%, #0a1630 46%, #07111e 100%);
 }
 
 body::before {
@@ -74,9 +74,9 @@ body::before {
   }
 
   .control-shell:focus-within {
-    border-color: rgba(125, 211, 252, 0.34);
+    border-color: rgba(96, 165, 250, 0.42);
     background: rgba(8, 17, 24, 0.66);
-    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.08);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
   }
 
   .control-input {
@@ -124,9 +124,9 @@ body::before {
   .bg-mesh {
     background-color: #020617;
     background-image:
-      radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
-      radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 0.5) 0, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 0.5) 0, transparent 50%);
+      radial-gradient(at 0% 0%, hsla(221, 57%, 12%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 0%, hsla(214, 76%, 42%, 0.42) 0, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(233, 72%, 58%, 0.28) 0, transparent 50%);
     background-size: 200% 200%;
     animation: gradientMove 15s ease infinite;
   }

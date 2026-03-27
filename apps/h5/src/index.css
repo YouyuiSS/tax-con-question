@@ -1,8 +1,19 @@
 :root {
   color-scheme: light;
   font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
-  background: #f7f6f2;
-  color: #253039;
+  --bg-base: #f4f8ff;
+  --bg-surface: rgba(255, 255, 255, 0.9);
+  --bg-soft: rgba(226, 237, 255, 0.78);
+  --border-soft: rgba(108, 144, 196, 0.14);
+  --text-main: #1f3653;
+  --text-secondary: #56718f;
+  --text-muted: #7b93ae;
+  --accent-soft: #dceaff;
+  --accent-main: #3f76c5;
+  --accent-deep: #2c5ca6;
+  --accent-shadow: rgba(63, 118, 197, 0.22);
+  background: var(--bg-base);
+  color: var(--text-main);
 }
 
 * {
@@ -18,8 +29,9 @@ body,
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(198, 219, 230, 0.45), transparent 32%),
-    linear-gradient(180deg, #fbfbf8 0%, #f3f1ec 100%);
+    radial-gradient(circle at top left, rgba(135, 174, 233, 0.32), transparent 32%),
+    radial-gradient(circle at top right, rgba(191, 216, 255, 0.28), transparent 28%),
+    linear-gradient(180deg, #fbfdff 0%, #eef4ff 100%);
 }
 
 button,
@@ -44,7 +56,7 @@ input {
 
 .eyebrow {
   margin: 0 0 8px;
-  color: #5d707b;
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -64,7 +76,7 @@ input {
 .sheet-body,
 .sheet-note {
   margin: 12px 0 0;
-  color: #53636c;
+  color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.7;
 }
@@ -74,15 +86,15 @@ input {
   gap: 8px;
   margin-top: 6px;
   padding: 16px 18px;
-  border: 1px solid rgba(72, 98, 110, 0.08);
+  border: 1px solid var(--border-soft);
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 8px 24px rgba(45, 52, 50, 0.03);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 24px rgba(33, 57, 97, 0.04);
 }
 
 .risk-note-card p {
   margin: 0;
-  color: #53636c;
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -108,7 +120,7 @@ input {
 .route-caption,
 .count,
 .hint {
-  color: #77858d;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -116,19 +128,19 @@ input {
   width: 100%;
   min-height: 220px;
   padding: 20px;
-  border: 1px solid rgba(72, 98, 110, 0.08);
+  border: 1px solid var(--border-soft);
   border-radius: 24px;
-  background: rgba(230, 236, 231, 0.8);
-  color: #253039;
+  background: var(--bg-soft);
+  color: var(--text-main);
   resize: none;
   outline: none;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .question-input:focus {
-  border-color: rgba(72, 98, 110, 0.25);
+  border-color: rgba(63, 118, 197, 0.28);
   background: #ffffff;
-  box-shadow: 0 10px 30px rgba(45, 52, 50, 0.08);
+  box-shadow: 0 10px 30px rgba(63, 118, 197, 0.12);
 }
 
 .editor-meta {
@@ -160,13 +172,13 @@ input {
   background: rgba(255, 255, 255, 0.9);
   color: inherit;
   text-align: left;
-  box-shadow: 0 8px 24px rgba(45, 52, 50, 0.04);
+  box-shadow: 0 8px 24px rgba(33, 57, 97, 0.05);
   transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .route-card.selected {
-  background: #d9ebe0;
-  box-shadow: 0 10px 28px rgba(72, 98, 110, 0.08);
+  background: var(--accent-soft);
+  box-shadow: 0 10px 28px rgba(63, 118, 197, 0.14);
 }
 
 .route-card-head {
@@ -181,7 +193,7 @@ input {
 
 .route-card p {
   margin: 10px 0 0;
-  color: #53636c;
+  color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -195,7 +207,7 @@ input {
   position: sticky;
   bottom: 0;
   padding: 24px 0 4px;
-  background: linear-gradient(180deg, rgba(247, 246, 242, 0), rgba(247, 246, 242, 0.95) 28%);
+  background: linear-gradient(180deg, rgba(244, 248, 255, 0), rgba(244, 248, 255, 0.95) 28%);
 }
 
 .primary-button,
@@ -208,10 +220,10 @@ input {
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #4d6772 0%, #39515c 100%);
+  background: linear-gradient(135deg, var(--accent-main) 0%, var(--accent-deep) 100%);
   color: #f3fbff;
   font-weight: 700;
-  box-shadow: 0 12px 30px rgba(72, 98, 110, 0.24);
+  box-shadow: 0 12px 30px var(--accent-shadow);
 }
 
 .primary-button:disabled {
@@ -228,8 +240,8 @@ input {
 }
 
 .secondary-button {
-  background: rgba(232, 236, 231, 0.95);
-  color: #42535d;
+  background: rgba(226, 237, 255, 0.95);
+  color: #35577e;
   font-weight: 600;
 }
 
@@ -243,7 +255,7 @@ input {
   border: 0;
   padding: 0;
   background: transparent;
-  color: #48626e;
+  color: #3f6b9f;
   font-weight: 600;
 }
 
@@ -259,7 +271,7 @@ input {
   border: 0;
   padding: 0;
   background: transparent;
-  color: #48626e;
+  color: #3f6b9f;
   font-weight: 600;
 }
 
@@ -269,7 +281,7 @@ input {
   justify-content: center;
   width: 28px;
   height: 28px;
-  color: #48626e;
+  color: #3f6b9f;
   line-height: 1;
 }
 
@@ -293,19 +305,19 @@ input {
   border-radius: 999px;
   padding: 8px 14px;
   background: rgba(255, 255, 255, 0.88);
-  color: #53636c;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
 }
 
 .sort-chip.selected {
-  background: #d9ebe0;
-  color: #476158;
+  background: var(--accent-soft);
+  color: #315f98;
 }
 
 .discussion-title {
   margin: 0;
-  color: #48626e;
+  color: #3b6496;
   font-size: 18px;
   line-height: 1.3;
   font-weight: 700;
@@ -313,18 +325,18 @@ input {
 
 .search-input {
   width: 100%;
-  border: 1px solid rgba(72, 98, 110, 0.08);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   padding: 14px 16px;
   background: rgba(255, 255, 255, 0.88);
-  color: #253039;
+  color: var(--text-main);
   outline: none;
 }
 
 .search-input:focus {
-  border-color: rgba(72, 98, 110, 0.22);
+  border-color: rgba(63, 118, 197, 0.24);
   background: #ffffff;
-  box-shadow: 0 10px 30px rgba(45, 52, 50, 0.06);
+  box-shadow: 0 10px 30px rgba(63, 118, 197, 0.1);
 }
 
 .topic-strip {
@@ -345,13 +357,13 @@ input {
   border-radius: 999px;
   padding: 9px 14px;
   background: rgba(255, 255, 255, 0.88);
-  color: #53636c;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
 }
 
 .topic-chip.selected {
-  background: #48626e;
+  background: var(--accent-main);
   color: #f3fbff;
 }
 
@@ -365,8 +377,8 @@ input {
   border-radius: 24px;
   padding: 20px 18px 18px;
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(72, 98, 110, 0.06);
-  box-shadow: 0 8px 24px rgba(45, 52, 50, 0.04);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 8px 24px rgba(33, 57, 97, 0.04);
 }
 
 .discussion-card-foot {
@@ -382,7 +394,7 @@ input {
 }
 
 .discussion-age {
-  color: #8a98a6;
+  color: #8ca1b8;
   font-size: 12px;
 }
 
@@ -395,7 +407,7 @@ input {
   border-radius: 999px;
   padding: 4px 0;
   background: transparent;
-  color: #6b7c87;
+  color: #6783a0;
   font-size: 13px;
   font-weight: 600;
   transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
@@ -409,7 +421,7 @@ input {
 }
 
 .care-button.pending {
-  color: #607079;
+  color: #5b7590;
 }
 
 .care-button.cared {
@@ -461,7 +473,7 @@ input {
 
 .empty-state p {
   margin: 0;
-  color: #53636c;
+  color: var(--text-secondary);
   line-height: 1.7;
 }
 
@@ -495,8 +507,8 @@ input {
   margin: 0 auto;
   padding: 14px 18px 24px;
   border-radius: 28px 28px 0 0;
-  background: rgba(251, 251, 248, 0.96);
-  box-shadow: 0 -14px 36px rgba(30, 37, 42, 0.16);
+  background: rgba(248, 251, 255, 0.97);
+  box-shadow: 0 -14px 36px rgba(33, 57, 97, 0.14);
   text-align: center;
 }
 
@@ -505,7 +517,7 @@ input {
   height: 5px;
   margin: 0 auto 16px;
   border-radius: 999px;
-  background: rgba(118, 124, 121, 0.35);
+  background: rgba(123, 147, 174, 0.35);
 }
 
 .sheet-visual,
@@ -524,7 +536,7 @@ input {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: rgba(209, 232, 221, 0.6);
+  background: rgba(220, 234, 255, 0.72);
 }
 
 .sheet-visual-ring {
@@ -546,7 +558,7 @@ input {
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #4d6772 0%, #39515c 100%);
+  background: linear-gradient(135deg, var(--accent-main) 0%, var(--accent-deep) 100%);
 }
 
 .success-check-icon {
@@ -557,7 +569,7 @@ input {
 
 .sheet-kicker {
   margin: 0 0 8px;
-  color: #77858d;
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -567,14 +579,14 @@ input {
   width: 100%;
   padding: 18px;
   border-radius: 22px;
-  background: rgba(232, 236, 231, 0.72);
+  background: rgba(226, 237, 255, 0.72);
   text-align: left;
 }
 
 .summary-label {
   display: block;
   margin-bottom: 8px;
-  color: #77858d;
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -588,7 +600,7 @@ input {
 
 .summary-note {
   margin: 8px 0 0;
-  color: #53636c;
+  color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -602,7 +614,7 @@ input {
   margin: 14px auto 0;
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(209, 232, 221, 0.35);
+  background: rgba(220, 234, 255, 0.54);
   font-size: 14px;
 }
 
@@ -637,7 +649,7 @@ input {
 
 .success-header-title {
   margin: 0;
-  color: #32576a;
+  color: #315b94;
   font-size: 17px;
   font-weight: 700;
   text-align: center;
@@ -670,13 +682,13 @@ input {
 
 .success-copy p {
   margin: 0;
-  color: #57666d;
+  color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.7;
 }
 
 .success-note {
-  color: #6d7d84;
+  color: #6883a0;
   font-size: 14px;
 }
 
@@ -684,7 +696,7 @@ input {
   width: 100%;
   height: 1px;
   margin-top: 2px;
-  background: linear-gradient(90deg, rgba(72, 98, 110, 0), rgba(72, 98, 110, 0.14), rgba(72, 98, 110, 0));
+  background: linear-gradient(90deg, rgba(63, 118, 197, 0), rgba(63, 118, 197, 0.16), rgba(63, 118, 197, 0));
 }
 
 .success-flow-card {
@@ -695,14 +707,14 @@ input {
 }
 
 .success-flow-label {
-  color: #7b888f;
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
 }
 
 .success-flow-card p {
   margin: 0;
-  color: #88959b;
+  color: #7d93ab;
   font-size: 15px;
   line-height: 1.8;
 }
@@ -715,7 +727,7 @@ input {
   overflow: hidden;
   border-radius: 26px;
   box-shadow:
-    0 22px 36px rgba(67, 82, 89, 0.14);
+    0 22px 36px rgba(63, 118, 197, 0.18);
 }
 
 .success-scene::after {
@@ -741,7 +753,7 @@ input {
   justify-content: center;
   gap: 8px;
   margin-top: 2px;
-  color: #406171;
+  color: #3668a2;
   font-size: 15px;
   font-weight: 600;
 }

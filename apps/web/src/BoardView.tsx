@@ -172,11 +172,11 @@ function getCardMetrics(count: number): { width: number; height: number } {
 
 function getCardSizeClass(count: number) {
   if (count >= 6) {
-    return 'w-[32rem] min-h-[16rem] p-8 text-3xl font-bold border-cyan-400/40 shadow-[0_0_30px_rgba(34,211,238,0.18)]';
+    return 'w-[32rem] min-h-[16rem] p-8 text-3xl font-bold border-sky-400/40 shadow-[0_0_30px_rgba(59,130,246,0.2)]';
   }
 
   if (count >= 3) {
-    return 'w-[28rem] min-h-[14rem] p-6 text-2xl font-semibold border-blue-400/30 shadow-[0_0_20px_rgba(59,130,246,0.15)]';
+    return 'w-[28rem] min-h-[14rem] p-6 text-2xl font-semibold border-blue-400/34 shadow-[0_0_24px_rgba(59,130,246,0.18)]';
   }
 
   return 'w-[22rem] min-h-[11rem] p-5 text-xl font-medium border-white/10';
@@ -233,7 +233,7 @@ function QuestionCardContent({
     <>
       <div className="relative z-10">
         <div className="mb-5 flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-cyan-100/90">
+          <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-sky-100/90">
             {tagLabel}
           </span>
         </div>
@@ -308,7 +308,7 @@ function GridQuestionCard({
       className={cn(
         'glass-card holo-sweep relative flex flex-col justify-between rounded-3xl transition-colors duration-500',
         getCardSizeClass(count),
-        focused ? 'border-cyan-300/38 shadow-[0_0_42px_rgba(34,211,238,0.18)]' : 'hover:border-white/30',
+        focused ? 'border-sky-300/38 shadow-[0_0_42px_rgba(59,130,246,0.2)]' : 'hover:border-white/30',
         onClick && 'cursor-pointer hover:-translate-y-1',
       )}
     >
@@ -373,9 +373,9 @@ function FocusedQuestionOverlay({
         animate={{ scale: 1, y: 0, opacity: 1 }}
         exit={{ scale: 0.94, opacity: 0, filter: 'blur(12px)' }}
         transition={{ type: 'spring', stiffness: 200, damping: 24 }}
-        className="glass-card relative z-10 w-[88vw] max-w-6xl overflow-hidden rounded-[3rem] border border-cyan-300/24 p-12 shadow-[0_0_80px_rgba(34,211,238,0.14)]"
+        className="glass-card relative z-10 w-[88vw] max-w-6xl overflow-hidden rounded-[3rem] border border-sky-300/24 p-12 shadow-[0_0_80px_rgba(59,130,246,0.16)]"
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/8 via-transparent to-blue-500/8" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-400/10 via-transparent to-indigo-500/10" />
 
         <div className="relative z-10 flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-full border border-white/14 bg-white/8 px-4 py-2 text-white/78">
@@ -409,8 +409,8 @@ function FocusedQuestionOverlay({
               className={cn(
                 'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition',
                 markingAnswered
-                  ? 'cursor-wait border-cyan-300/16 bg-cyan-300/10 text-cyan-100/70'
-                  : 'border-cyan-300/24 bg-cyan-300/12 text-cyan-100/92 hover:border-cyan-300/36 hover:bg-cyan-300/16',
+                  ? 'cursor-wait border-sky-300/16 bg-sky-300/10 text-sky-100/70'
+                  : 'border-sky-300/24 bg-sky-300/12 text-sky-100/92 hover:border-sky-300/36 hover:bg-sky-300/16',
               )}
             >
               <Check className="h-4 w-4" />
@@ -742,6 +742,11 @@ export function BoardView({
   function applyUpdatedQuestion(question: Question) {
     upsertQuestionSnapshot(question);
 
+    if (!isVisibleOnBoard(question)) {
+      removeBoardQuestion(question.id);
+      return;
+    }
+
     if (syncKnownQuestion(question)) {
       return;
     }
@@ -1066,16 +1071,16 @@ export function BoardView({
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-mesh font-sans text-white selection:bg-cyan-500/20">
+    <div className="relative min-h-screen w-full overflow-hidden bg-mesh font-sans text-white selection:bg-blue-500/20">
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="orb h-[36vw] w-[36vw] animate-[float_22s_infinite_alternate] bg-cyan-600/15 left-[-8%] top-[-10%]" />
+        <div className="orb h-[36vw] w-[36vw] animate-[float_22s_infinite_alternate] bg-blue-600/18 left-[-8%] top-[-10%]" />
         <div className="orb h-[44vw] w-[44vw] animate-[float_28s_infinite_alternate_reverse] bg-indigo-500/16 bottom-[-18%] right-[-10%]" />
         <div className="orb h-[30vw] w-[30vw] animate-[float_32s_infinite_alternate] bg-sky-500/12 left-[42%] top-[42%]" />
       </div>
 
       <header className="pointer-events-none absolute left-0 right-0 top-0 z-30 flex items-start justify-between px-8 pb-8 pt-4">
         <div>
-          <h1 className="text-5xl font-black leading-[0.92] tracking-tight text-white drop-shadow-[0_0_18px_rgba(34,211,238,0.22)] xl:text-6xl">
+          <h1 className="text-5xl font-black leading-[0.92] tracking-tight text-white drop-shadow-[0_0_18px_rgba(59,130,246,0.24)] xl:text-6xl">
             税务产品心声广场
           </h1>
         </div>
@@ -1121,7 +1126,7 @@ export function BoardView({
                 className={cn(
                   'min-w-[4.5rem] whitespace-nowrap rounded-xl px-5 py-2 text-sm font-semibold transition-all',
                   sortType === 'count'
-                    ? 'bg-white/12 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.12)]'
+                    ? 'bg-white/12 text-sky-200 shadow-[0_0_16px_rgba(59,130,246,0.14)]'
                     : 'text-white/50 hover:bg-white/6 hover:text-white/80',
                 )}
                 onClick={() => setSortType('count')}
@@ -1133,7 +1138,7 @@ export function BoardView({
                 className={cn(
                   'min-w-[4.5rem] whitespace-nowrap rounded-xl px-5 py-2 text-sm font-semibold transition-all',
                   sortType === 'date'
-                    ? 'bg-white/12 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.12)]'
+                    ? 'bg-white/12 text-sky-200 shadow-[0_0_16px_rgba(59,130,246,0.14)]'
                     : 'text-white/50 hover:bg-white/6 hover:text-white/80',
                 )}
                 onClick={() => setSortType('date')}
@@ -1150,7 +1155,7 @@ export function BoardView({
             className={cn(
               'mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] backdrop-blur-md',
               connectionState === 'live'
-                ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100'
+                ? 'border-sky-300/20 bg-sky-300/10 text-sky-100'
                 : connectionState === 'connecting'
                   ? 'border-white/10 bg-white/8 text-white/70'
                   : 'border-amber-300/20 bg-amber-300/10 text-amber-100',
@@ -1160,7 +1165,7 @@ export function BoardView({
               className={cn(
                 'h-2 w-2 rounded-full',
                 connectionState === 'live'
-                  ? 'bg-cyan-300'
+                  ? 'bg-sky-300'
                   : connectionState === 'connecting'
                     ? 'bg-white/50'
                     : 'bg-amber-300',
@@ -1178,8 +1183,8 @@ export function BoardView({
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/45">Visible Questions</p>
             </div>
             <div className="border-t border-white/8 pt-3">
-              <p className="text-4xl font-mono font-black text-cyan-100">{answeredCount}</p>
-              <p className="text-[11px] font-bold tracking-[0.24em] text-cyan-100/52">ANSWERED</p>
+              <p className="text-4xl font-mono font-black text-sky-100">{answeredCount}</p>
+              <p className="text-[11px] font-bold tracking-[0.24em] text-sky-100/52">ANSWERED</p>
             </div>
           </div>
         </div>
@@ -1202,7 +1207,7 @@ export function BoardView({
         ) : sortedQuestions.length === 0 ? (
           <div className="flex h-full items-center justify-center px-8 pb-12 pt-32">
             <div className="max-w-xl rounded-[2rem] border border-white/10 bg-white/6 px-10 py-10 text-center backdrop-blur-md">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-cyan-300/12 text-cyan-200">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-sky-300/12 text-sky-200">
                 <Sparkles className="h-7 w-7" />
               </div>
               <h2 className="mb-3 text-3xl font-bold text-white">
@@ -1235,12 +1240,12 @@ export function BoardView({
                           className={cn(
                             'inline-flex items-center gap-3 rounded-full border px-4 py-2 text-sm transition',
                             active
-                              ? 'border-cyan-300/26 bg-cyan-300/12 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]'
+                              ? 'border-sky-300/26 bg-sky-300/12 text-sky-100 shadow-[0_0_18px_rgba(59,130,246,0.14)]'
                               : 'border-white/10 bg-white/6 text-white/58 hover:border-white/18 hover:bg-white/8 hover:text-white/78',
                           )}
                         >
                           <span className="font-semibold">{option.tag}</span>
-                          <span className={cn('text-xs', active ? 'text-cyan-100/72' : 'text-white/40')}>
+                          <span className={cn('text-xs', active ? 'text-sky-100/72' : 'text-white/40')}>
                             {option.count} 条
                           </span>
                         </button>
@@ -1314,10 +1319,10 @@ export function BoardView({
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.92, opacity: 0, filter: 'blur(20px)' }}
               transition={{ type: 'spring', stiffness: 180, damping: 22 }}
-              className="glass-card relative w-[92vw] max-w-5xl overflow-hidden rounded-[3rem] border border-cyan-300/25 p-14 text-left shadow-[0_0_90px_rgba(34,211,238,0.15)]"
+              className="glass-card relative w-[92vw] max-w-5xl overflow-hidden rounded-[3rem] border border-sky-300/25 p-14 text-left shadow-[0_0_90px_rgba(59,130,246,0.18)]"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/8 via-transparent to-blue-500/8" />
-              <div className="relative z-10 mb-7 inline-flex w-fit items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+              <div className="absolute inset-0 bg-gradient-to-br from-sky-400/10 via-transparent to-indigo-500/10" />
+              <div className="relative z-10 mb-7 inline-flex w-fit items-center gap-2 rounded-full border border-sky-300/20 bg-sky-300/10 px-4 py-2 text-sm font-semibold text-sky-100">
                 <Sparkles className="h-4 w-4" />
                 新问题进入现场
               </div>
@@ -1327,7 +1332,7 @@ export function BoardView({
               </h2>
 
               <div className="relative z-10 flex items-center justify-start gap-3 text-sm text-white/80">
-                <span className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-4 py-2">
+                <span className="rounded-full border border-sky-300/18 bg-sky-300/10 px-4 py-2">
                   {getQuestionTagLabel(highlightedQuestion)}
                 </span>
               </div>
@@ -1353,7 +1358,7 @@ export function BoardView({
             className={cn(
               'relative inline-flex h-7 w-12 rounded-full border transition',
               showAnswered
-                ? 'border-cyan-300/30 bg-cyan-300/18'
+                ? 'border-sky-300/30 bg-sky-300/18'
                 : 'border-white/10 bg-white/10',
             )}
           >

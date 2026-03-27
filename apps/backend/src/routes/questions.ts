@@ -190,6 +190,14 @@ function broadcastBoardQuestionCreated(question: Question): void {
 }
 
 function broadcastBoardQuestionUpdated(question: Question): void {
+  if (!isBoardVisibleQuestion(question)) {
+    broadcastBoard({
+      type: 'question.deleted',
+      payload: { id: question.id },
+    });
+    return;
+  }
+
   broadcastBoard({
     type: 'question.updated',
     payload: toBoardQuestionView(question),

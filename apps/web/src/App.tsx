@@ -90,16 +90,16 @@ const ANSWER_STATUS_LABEL: Record<AnswerStatus, string> = {
 };
 
 const ROUTE_BADGE_STYLES: Record<QuestionRoute, string> = {
-  public_discuss: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100',
-  meeting_only: 'border-sky-400/30 bg-sky-400/10 text-sky-100',
+  public_discuss: 'border-sky-400/30 bg-sky-400/10 text-sky-100',
+  meeting_only: 'border-blue-400/30 bg-blue-400/10 text-blue-100',
 };
 
 const ARCHIVED_BADGE_TONE = 'border-slate-300/20 bg-slate-200/10 text-slate-200';
 
 const ANSWER_STATUS_BADGE_STYLES: Record<AnswerStatus, string> = {
   unanswered: 'border-white/10 bg-white/6 text-white/80',
-  answered_live: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
-  answered_post: 'border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-100',
+  answered_live: 'border-sky-300/30 bg-sky-300/10 text-sky-100',
+  answered_post: 'border-blue-300/30 bg-blue-300/10 text-blue-100',
 };
 
 const ROUTE_OPTIONS = [
@@ -234,7 +234,7 @@ function SummaryCard({ label, value, hint, active = false, onClick }: SummaryCar
       className={cn(
         'panel relative overflow-hidden rounded-[1.75rem] border px-5 py-5 text-left transition duration-200',
         active
-          ? 'border-cyan-300/30 shadow-[0_18px_50px_rgba(16,185,129,0.16)]'
+          ? 'border-sky-300/30 shadow-[0_18px_50px_rgba(59,130,246,0.18)]'
           : 'border-white/8 hover:border-white/16',
       )}
     >
@@ -251,7 +251,7 @@ function SummaryCard({ label, value, hint, active = false, onClick }: SummaryCar
 function SectionTitle({ icon, title, subtitle }: { icon: ReactNode; title: string; subtitle: string }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-cyan-100">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-sky-100">
         {icon}
       </div>
       <div>
@@ -571,7 +571,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
         <header className="panel sticky top-4 z-20 rounded-[2rem] border border-white/8 px-5 py-5 backdrop-blur-xl md:px-7">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_30px_rgba(45,212,191,0.12)]">
+              <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-sky-300/20 bg-sky-300/10 text-sky-100 shadow-[0_0_30px_rgba(59,130,246,0.16)]">
                 <Sparkles className="h-6 w-6" />
               </div>
               <div>
@@ -607,7 +607,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
                 <div className="flex items-center gap-2 text-sm text-white/70">
                   {connectionState === 'live' ? (
-                    <Wifi className="h-4 w-4 text-emerald-300" />
+                    <Wifi className="h-4 w-4 text-sky-300" />
                   ) : (
                     <WifiOff className="h-4 w-4 text-amber-200" />
                   )}
@@ -808,14 +808,14 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
               ) : null}
 
               {actionMessage ? (
-                <div className="border-b border-emerald-300/12 bg-emerald-300/6 px-6 py-3 text-sm text-emerald-50/90">
+                <div className="border-b border-sky-300/12 bg-sky-300/6 px-6 py-3 text-sm text-sky-50/90">
                   {actionMessage}
                 </div>
               ) : null}
 
               {filteredQuestions.length === 0 ? (
                 <div className="flex min-h-[420px] flex-col items-center justify-center px-6 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/8 text-cyan-100">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/8 text-sky-100">
                     <BadgeCheck className="h-7 w-7" />
                   </div>
                   <h3 className="mt-5 text-2xl font-semibold text-white">当前筛选下没有问题</h3>
@@ -856,7 +856,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                             className={cn(
                               'grid w-full grid-cols-[120px_minmax(0,2.3fr)_150px_220px] gap-3 rounded-[1.5rem] border px-3 py-3 text-left transition',
                               isSelected
-                                ? 'border-cyan-300/28 bg-cyan-300/10 shadow-[0_16px_45px_rgba(6,182,212,0.14)]'
+                                ? 'border-sky-300/28 bg-sky-300/10 shadow-[0_16px_45px_rgba(59,130,246,0.18)]'
                                 : 'border-white/8 bg-white/4 hover:border-white/15 hover:bg-white/6',
                             )}
                           >
@@ -880,7 +880,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                                     className={cn(
                                       'inline-flex items-center rounded-full border px-2.5 py-1',
                                       question.tag.trim()
-                                        ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100/88'
+                                        ? 'border-sky-300/20 bg-sky-300/10 text-sky-100/88'
                                         : 'border-white/10 bg-white/6 text-white/45',
                                     )}
                                   >
@@ -923,8 +923,8 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                                   className={cn(
                                     'inline-flex items-center justify-center gap-2 rounded-full border px-3.5 py-2 text-xs font-semibold tracking-[0.02em] transition',
                                     savingKey === answerActionKey
-                                      ? 'border-emerald-300/28 bg-emerald-300/14 text-emerald-100'
-                                      : 'border-emerald-300/18 bg-emerald-300/8 text-emerald-50/88 hover:border-emerald-300/30 hover:bg-emerald-300/14',
+                                      ? 'border-blue-300/28 bg-blue-300/14 text-blue-100'
+                                      : 'border-blue-300/18 bg-blue-300/8 text-blue-50/88 hover:border-blue-300/30 hover:bg-blue-300/14',
                                     isBusy && 'cursor-not-allowed opacity-60',
                                   )}
                                 >
@@ -1007,7 +1007,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                     <div className="mt-6 space-y-6">
                       <section>
                         <div className="flex items-center gap-2">
-                          <Tag className="h-4 w-4 text-cyan-100" />
+                          <Tag className="h-4 w-4 text-sky-100" />
                           <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
                             标签
                           </h3>
@@ -1024,7 +1024,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                               onChange={(event) => setTagDraft(event.target.value)}
                               placeholder="例如：晋升与发展"
                               maxLength={120}
-                              className="min-w-0 flex-1 rounded-[1.15rem] border border-white/10 bg-white/6 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-cyan-300/24 focus:bg-white/8"
+                              className="min-w-0 flex-1 rounded-[1.15rem] border border-white/10 bg-white/6 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-sky-300/24 focus:bg-white/8"
                             />
                             <button
                               type="button"
@@ -1040,7 +1040,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                               className={cn(
                                 'rounded-[1.15rem] border px-4 py-3 text-sm font-medium transition sm:min-w-[110px]',
                                 savingKey === `tag:${selectedQuestion.id}`
-                                  ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100'
+                                  ? 'border-sky-300/20 bg-sky-300/10 text-sky-100'
                                   : 'border-white/10 bg-white/8 text-white/82 hover:border-white/18 hover:bg-white/10',
                                 (savingKey || tagDraft.trim() === selectedQuestion.tag.trim())
                                 && 'cursor-not-allowed opacity-60',
@@ -1054,7 +1054,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
 
                       <section>
                         <div className="flex items-center gap-2">
-                          <BadgeCheck className="h-4 w-4 text-cyan-100" />
+                          <BadgeCheck className="h-4 w-4 text-sky-100" />
                           <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
                             答复推进
                           </h3>
@@ -1084,7 +1084,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                                 className={cn(
                                   'rounded-[1.35rem] border px-4 py-3 text-sm font-medium transition',
                                   active
-                                    ? 'border-cyan-300/28 bg-cyan-300/12 text-white'
+                                    ? 'border-sky-300/28 bg-sky-300/12 text-white'
                                     : 'border-white/8 bg-white/4 text-white/78 hover:border-white/16 hover:bg-white/6',
                                 )}
                               >
@@ -1097,7 +1097,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
 
                       <section>
                         <div className="flex items-center gap-2">
-                          <ShieldAlert className="h-4 w-4 text-cyan-100" />
+                          <ShieldAlert className="h-4 w-4 text-sky-100" />
                           <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
                             归档
                           </h3>
@@ -1159,7 +1159,7 @@ function ManagementView({ onOpenBoard }: { onOpenBoard: () => void }) {
                     className="panel flex min-h-[520px] items-center justify-center rounded-[2rem] border border-white/8 px-6 text-center"
                   >
                     <div>
-                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/8 text-cyan-100">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/8 text-sky-100">
                         <MessageSquareText className="h-7 w-7" />
                       </div>
                       <h2 className="mt-5 text-2xl font-semibold text-white">选择一条问题查看详情</h2>
